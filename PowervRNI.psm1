@@ -3,9 +3,22 @@
 # msmit@vmware.com
 # Version 0.1
 
-# Store the authentication token globally so we can re-use it
-$Global:vRNIAuthToken = ""
-$Global:vRNIAuthTokenExpires = 0;
+
+# Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource
+$Script:DatasourceURLs = @{}
+$Script:DatasourceURLs.Add("vcenter", @("/data-sources/vcenters"))
+$Script:DatasourceURLs.Add("nsxv", @("/data-sources/nsxv-managers"))
+$Script:DatasourceURLs.Add("ciscoswitch", @("/data-sources/cisco-switches"))
+$Script:DatasourceURLs.Add("aristaswitch", @("/data-sources/arista-switches"))
+$Script:DatasourceURLs.Add("dellswitch", @("/data-sources/dell-switches"))
+$Script:DatasourceURLs.Add("brocadeswitch", @("/data-sources/brocade-switches"))
+$Script:DatasourceURLs.Add("juniperswitch", @("/data-sources/juniper-switches"))
+$Script:DatasourceURLs.Add("ciscoucs", @("/data-sources/ucs-managers"))
+$Script:DatasourceURLs.Add("hponeview", @("/data-sources/hpov-managers"))
+$Script:DatasourceURLs.Add("hpvcmanager", @("/data-sources/hpvc-managers"))
+$Script:DatasourceURLs.Add("checkpointfirewall", @("/data-sources/checkpoint-firewalls"))
+$Script:DatasourceURLs.Add("panfirewall", @("/data-sources/panorama-firewalls"))
+$Script:DatasourceURLs.Add("all", @("/data-sources/vcenters", "/data-sources/nsxv-managers", "/data-sources/cisco-switches", "/data-sources/arista-switches", "/data-sources/dell-switches", "/data-sources/brocade-switches", "/data-sources/juniper-switches", "/data-sources/ucs-managers", "/data-sources/hpov-managers", "/data-sources/hpvc-managers", "/data-sources/checkpoint-firewalls", "/data-sources/panorama-firewalls"))
 
 function Invoke-NIRestMethod
 {
@@ -195,11 +208,12 @@ function Disconnect-vRNIServer
   $result
 }
 
+
 function Get-vRNIDataSource
 {
   param (
     [Parameter (Mandatory=$false)]
-      # Which datasource type to get
+      # Which datasource type to get - TODO: make this a dynamic param to get the values from $Script:data
       [ValidateSet ("vcenter", "nsxv", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall", "all")]
       [string]$DatasourceType="all",
     [Parameter (Mandatory=$False)]
@@ -208,25 +222,10 @@ function Get-vRNIDataSource
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  # Resolve which datasource types to retrieve
-  $datasource_urls = @{}
-  $datasource_urls.Add("vcenter", @("/data-sources/vcenters"))
-  $datasource_urls.Add("nsxv", @("/data-sources/nsxv-managers"))
-  $datasource_urls.Add("ciscoswitch", @("/data-sources/cisco-switches"))
-  $datasource_urls.Add("aristaswitch", @("/data-sources/arista-switches"))
-  $datasource_urls.Add("dellswitch", @("/data-sources/dell-switches"))
-  $datasource_urls.Add("brocadeswitch", @("/data-sources/brocade-switches"))
-  $datasource_urls.Add("juniperswitch", @("/data-sources/juniper-switches"))
-  $datasource_urls.Add("ciscoucs", @("/data-sources/ucs-managers"))
-  $datasource_urls.Add("hponeview", @("/data-sources/hpov-managers"))
-  $datasource_urls.Add("hpvcmanager", @("/data-sources/hpvc-managers"))
-  $datasource_urls.Add("checkpointfirewall", @("/data-sources/checkpoint-firewalls"))
-  $datasource_urls.Add("panfirewall", @("/data-sources/panorama-firewalls"))
-  $datasource_urls.Add("all", @("/data-sources/vcenters", "/data-sources/nsxv-managers", "/data-sources/cisco-switches", "/data-sources/arista-switches", "/data-sources/dell-switches", "/data-sources/brocade-switches", "/data-sources/juniper-switches", "/data-sources/ucs-managers", "/data-sources/hpov-managers", "/data-sources/hpvc-managers", "/data-sources/checkpoint-firewalls", "/data-sources/panorama-firewalls"))
 
   $datasources = [System.Collections.ArrayList]@()
 
-  $datasource_types_to_get = $datasource_urls.$DatasourceType
+  $datasource_types_to_get = $Script:DatasourceURLs.$DatasourceType
 
   foreach($datasource_uri in $datasource_types_to_get)
   {
@@ -243,8 +242,10 @@ function Get-vRNIDataSource
 
   }
 
+  # Return all found data sources
   $datasources
 }
+
 
 function Get-vRNIAPIVersion
 {
@@ -283,4 +284,25 @@ function Get-vRNINodes
 }
 
 
-Connect-vRNIServer -Server 10.126.101.221 -Username admin@local -Password admin
+function Get-vRNIApplication
+{
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $application_list = Invoke-NIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications"
+
+
+  $applications = [System.Collections.ArrayList]@()
+
+  foreach($app in $application_list.results)
+  {
+    $app_info = Invoke-NIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($app.entity_id)"
+    $applications.Add($app_info) | Out-Null
+  }
+
+  $applications
+}
