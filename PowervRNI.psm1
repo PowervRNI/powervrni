@@ -1,7 +1,10 @@
 # vRealize Network Insight PowerShell module
-# Martijn Smit
+# Martijn Smit (@smitmartijn)
 # msmit@vmware.com
 # Version 0.1
+#
+# Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing the base
+# functions & principles on which this module is built on.
 
 
 # Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource
@@ -20,11 +23,41 @@ $Script:DatasourceURLs.Add("checkpointfirewall", @("/data-sources/checkpoint-fir
 $Script:DatasourceURLs.Add("panfirewall", @("/data-sources/panorama-firewalls"))
 $Script:DatasourceURLs.Add("all", @("/data-sources/vcenters", "/data-sources/nsxv-managers", "/data-sources/cisco-switches", "/data-sources/arista-switches", "/data-sources/dell-switches", "/data-sources/brocade-switches", "/data-sources/juniper-switches", "/data-sources/ucs-managers", "/data-sources/hpov-managers", "/data-sources/hpvc-managers", "/data-sources/checkpoint-firewalls", "/data-sources/panorama-firewalls"))
 
-function Invoke-NIRestMethod
-{
 
+
+function Invoke-vRNIRestMethod
+{
   <#
-  Invoke-NIRestMethod -Method get -Uri "/api/2.0/vdn/scopes"
+  .SYNOPSIS
+  Forms and executes a REST API call to a vRealize Network Insight Platform VM.
+
+  .DESCRIPTION
+  Invoke-vRNIRestMethod uses either a specified connection object as returned
+  by Connect-vRNIServer, or the $defaultvRNIConnection global variable if
+  defined to construct a REST api call to the vRNI API.
+
+  Invoke-vRNIRestMethod constructs the appropriate request headers required by
+  the vRNI API, including the authentication token (built from the connection
+  object) and the content type, before making the rest call and returning the
+  appropriate JSON object to the caller cmdlet.
+
+  .EXAMPLE
+  Invoke-vRNIRestMethod -Method GET -Uri "/api/ni/data-sources/vcenters"
+
+  Performs a 'GET' against the URI /api/ni/data-sources/vcenters and returns
+  the JSON object which contains the vRNI response. This call requires the
+  $defaultvRNIConnection variable to exist and be populated with server and
+  authentiation details as created by Connect-vRNIServer, or it fails with a
+  message to first use Connect-vRNIServer
+
+  .EXAMPLE
+  $MyConnection = Connect-vRNIServer -Server vrni-platform.lab.local
+  Invoke-vRNIRestMethod -Method GET -Uri "/api/ni/data-sources/vcenters" -Connection $MyConnection
+
+  Connects to a vRNI Platform VM and stores the connection details in a
+  variable, which in turn is used for the following cmdlet to retrieve
+  all vCenter datasources. The JSON object containing the vRNI response
+  is returned.
   #>
 
   [CmdletBinding(DefaultParameterSetName="ConnectionObj")]
@@ -50,7 +83,7 @@ function Invoke-NIRestMethod
       [psObject]$Connection
   )
 
-  if ($pscmdlet.ParameterSetName -eq "ConnectionObj" )
+  if ($pscmdlet.ParameterSetName -eq "ConnectionObj")
   {
     # Ensure we were either called with a connection or there is a defaultConnection (user has called Connect-vRNIServer)
     if ($connection -eq $null)
@@ -75,15 +108,19 @@ function Invoke-NIRestMethod
     }
   }
 
+  # Create a header option dictionary, to be used for authentication (if we have an existing session) and other RESTy stuff
   $headerDict = @{}
+  $headerDict.add("Content-Type", "application/json")
+
   if($authtoken -ne "") {
     $headerDict.add("Authorization", "NetworkInsight $authtoken")
   }
 
+  # Form the URL to call and write in our journal about this call
   $URL = "https://$($Server)$($URI)"
+  Write-Debug "$(Get-Date -format s)  REST Call via Invoke-RestMethod: $Method $URL - with body: $Body"
 
-  Write-Debug "$(Get-Date -format s)  REST Call via invoke-webrequest: Method: $Method, URI: $URL, Body: $Body"
-
+  # Energize!
   try
   {
     if ($Body -ne "") {
@@ -137,6 +174,47 @@ function Invoke-NIRestMethod
 
 function Connect-vRNIServer
 {
+  <#
+  .SYNOPSIS
+  Connects to the specified vRealize Network Insight Platform VM and
+  constructs a connection object.
+
+  .DESCRIPTION
+  The Connect-vRNIServer cmdlet returns a connection object that contains
+  an authentication token which the rest of the cmdlets in this module
+  use to perform authenticated REST API calls.
+
+  The connection object contains the authentication token, the expiry
+  timestamp that the token expires and the vRNI server IP.
+
+
+  .EXAMPLE
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local
+
+  Connect to vRNI Platform VM with the hostname vrni-platform.lab.local,
+  the cmdlet will prompt for credentials. Returns the connection object,
+  if successful.
+
+  .EXAMPLE
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password secret
+
+  Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
+  with the given local credentials. Returns the connection object, if successful.
+
+  .EXAMPLE
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password secret -Domain ld.local
+
+  Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
+  with the given LDAP credentials. Returns the connection object, if successful.
+
+  .EXAMPLE
+  PS C:\> $MyConnection = Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password secret
+  PS C:\> Get-vRNIDataSource -Connection $MyConnection
+
+  Connects to vRNI with the given credentials and then uses the returned
+  connection object in the next cmdlet to retrieve all datasources from
+  that specific vRNI instance.
+  #>
   param (
     [Parameter (Mandatory=$true)]
       # vRNI Platform hostname or IP address
@@ -156,27 +234,30 @@ function Connect-vRNIServer
       [string]$Domain = "LOCAL"
   )
 
+  # Start building the hash table containing the login call we need to do
   $requestFormat = @{
     "username" = $Username
     "password" = $Password
   }
 
+  # If no domain param is given, use the default LOCAL domain and populate the "domain" field
   if($Domain -eq "LOCAL") {
     $requestFormat.domain = @{
       "domain_type" = "LOCAL"
       "value" = "local"
-    };
+    }
   }
+  # Otherwise there a LDAP domain requested for credentials
   else {
     $requestFormat.domain = @{
       "domain_type" = "LDAP"
       "value" = $Domain
-    };
+    }
   }
 
+  # Convert the hash to JSON and send the request to vRNI
   $requestBody = ConvertTo-Json $requestFormat
-
-  $response = Invoke-NIRestMethod -Server $Server -Method POST -URI "/api/ni/auth/token" -Body $requestBody
+  $response = Invoke-vRNIRestMethod -Server $Server -Method POST -URI "/api/ni/auth/token" -Body $requestBody
 
   if($response)
   {
@@ -197,6 +278,26 @@ function Connect-vRNIServer
 
 function Disconnect-vRNIServer
 {
+  <#
+  .SYNOPSIS
+  Destroys the Connection object if provided, otherwise this destroys the
+  $defaultvRNIConnection global variable if it exists.
+
+  .DESCRIPTION
+  Although REST is not connection-orientated, vRNI does remember the authentication
+  token which is used throughout the session. This cmdlet also invalidates the
+  authentication token from vRNI, so it can no longer be used.
+
+  .EXAMPLE
+  PS C:\> Disconnect-vRNIServer
+
+  Invalidates and removes the global default connection variable.
+
+  .EXAMPLE
+  PS C:\> Disconnect-vRNIServer -Connection $MyConnection
+
+  Invalidates the authentication token of a specific connection object
+  #>
   param (
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
@@ -204,13 +305,44 @@ function Disconnect-vRNIServer
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  $result = Invoke-NIRestMethod -Connection $Connection -Method DELETE -URI "/api/ni/auth/token"
+  # Invalidate auth token from vRNI
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -URI "/api/ni/auth/token"
+
+  # Remove the global default connection variable, if the -Connection parameter is the same as the default
+  if ($Connection -eq $defaultvRNIConnection) {
+    if (Get-Variable -Name defaultvRNIConnection -scope global) {
+      Remove-Variable -name defaultvRNIConnection -scope global
+    }
+  }
+
   $result
 }
 
 
 function Get-vRNIDataSource
 {
+  <#
+  .SYNOPSIS
+  Retrieve datasource information
+
+  .DESCRIPTION
+  Datasources within vRealize Network Insight provide the data shown in
+  the UI. The vRNI Collectors periodically polls the datasources as the
+  source of truth. Typically you have a vCenter, NSX Manager and physical
+  switches as the datasource.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIDataSource
+
+  Retrieves the details of all datasource types.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIDataSource -DatasourceType nsxv
+
+  Retrieves the defaults of all NSX Managers added to vRNI as a datasource.
+  #>
   param (
     [Parameter (Mandatory=$false)]
       # Which datasource type to get - TODO: make this a dynamic param to get the values from $Script:data
@@ -222,24 +354,28 @@ function Get-vRNIDataSource
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-
+  # Use this as a return container
   $datasources = [System.Collections.ArrayList]@()
 
+  # Because each datasource type has its unique URL (/api/ni/data-sources/vcenter, /data-sources/ucs-manager, etc),
+  # and we want all the datasource information, loop through the URLs of the types we want to retrieve and
   $datasource_types_to_get = $Script:DatasourceURLs.$DatasourceType
-
   foreach($datasource_uri in $datasource_types_to_get)
   {
-    $response = Invoke-NIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)"
+    # Energize!
+    $response = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)"
 
+    # Process results, if there are datasources of this type. The results of the /api/ni/data-sources/$TYPE call is a
+    # list of datasource IDs and not much more. We take that ID and do a call for details on that datasource
     if($response.results -ne "")
     {
       foreach ($datasource in $response.results)
       {
-        $datasource_detail = Invoke-NIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)/$($datasource.entity_id)"
+        # Retrieve datasource details and store it
+        $datasource_detail = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)/$($datasource.entity_id)"
         $datasources.Add($datasource_detail) | Out-Null
       }
     }
-
   }
 
   # Return all found data sources
@@ -249,6 +385,20 @@ function Get-vRNIDataSource
 
 function Get-vRNIAPIVersion
 {
+  <#
+  .SYNOPSIS
+  Retrieve the version number of the vRealize Network Insight API.
+
+  .DESCRIPTION
+  The API of vRealize Network Insight is versioned and this retrieves
+  that version number.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIAPIVersion
+
+  Returns the version number of the vRNI API.
+  #>
   param (
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
@@ -256,13 +406,35 @@ function Get-vRNIAPIVersion
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  $version = Invoke-NIRestMethod -Connection $Connection -Method GET -URI "/api/ni/info/version"
+  $version = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/info/version"
   $version
 }
 
 
 function Get-vRNINodes
 {
+  <#
+  .SYNOPSIS
+  Retrieve details of the vRealize Network Insight nodes.
+
+  .DESCRIPTION
+  Nodes within a vRealize Network Insight typically consist of two
+  node types; collector VMs (or previously know as proxy VMs) and
+  platform VMs. You can have multiple of each type to support your
+  deployment and cluster them.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNINodes
+
+  Retrieves information about all available nodes.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"}
+
+  Retrieves information about all available nodes, but filter on the collector VMs.
+  #>
   param (
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
@@ -270,13 +442,17 @@ function Get-vRNINodes
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  $nodes = Invoke-NIRestMethod -Connection $Connection -Method GET -URI "/api/ni/infra/nodes"
+  # Get a list of available nodes first, this call returns a list of node IDs, which we can use
+  # to retrieve more details on the specific node
+  $nodes = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/infra/nodes"
 
+  # Use this as a result container
   $nodes_details = [System.Collections.ArrayList]@()
 
   foreach($node_record in $nodes.results)
   {
-    $node_info = Invoke-NIRestMethod -Connection $Connection -Method GET -URI "/api/ni/infra/nodes/$($node_record.id)"
+    # Retrieve the node details and store those
+    $node_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/infra/nodes/$($node_record.id)"
     $nodes_details.Add($node_info) | Out-Null
   }
 
@@ -286,6 +462,28 @@ function Get-vRNINodes
 
 function Get-vRNIApplication
 {
+  <#
+  .SYNOPSIS
+  Get Application information from vRealize Network Insight.
+
+  .DESCRIPTION
+  Within vRNI there are applications, which can be viewed as groups of VMs.
+  These groups can be used to group the VMs of a certain application together,
+  and filter on searches within vRNI. For instance, you can generate recommended
+  firewall rules based on an application group.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIApplication
+
+  Show all existing applications and their details.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIApplication | Where {$_.name -eq "3 Tier App"}
+
+  Get only the application details of the application named "3 Tier App"
+  #>
   param (
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
@@ -293,14 +491,17 @@ function Get-vRNIApplication
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  $application_list = Invoke-NIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications"
+  # First, get a list of all applications. This returns a list with application IDs which we can use
+  # to retrieve the details of the applications
+  $application_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications"
 
-
+  # Use this as a results container
   $applications = [System.Collections.ArrayList]@()
 
   foreach($app in $application_list.results)
   {
-    $app_info = Invoke-NIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($app.entity_id)"
+    # Retrieve application details and store them
+    $app_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($app.entity_id)"
     $applications.Add($app_info) | Out-Null
   }
 
