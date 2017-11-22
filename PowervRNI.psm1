@@ -172,6 +172,12 @@ function Invoke-vRNIRestMethod
   $response
 }
 
+#####################################################################################################################
+#####################################################################################################################
+########################################  Connection Management #####################################################
+#####################################################################################################################
+#####################################################################################################################
+
 function Connect-vRNIServer
 {
   <#
@@ -318,6 +324,92 @@ function Disconnect-vRNIServer
   $result
 }
 
+#####################################################################################################################
+#####################################################################################################################
+#######################################  Infrastructure Management ##################################################
+#####################################################################################################################
+#####################################################################################################################
+
+function Get-vRNINodes
+{
+  <#
+  .SYNOPSIS
+  Retrieve details of the vRealize Network Insight nodes.
+
+  .DESCRIPTION
+  Nodes within a vRealize Network Insight typically consist of two
+  node types; collector VMs (or previously know as proxy VMs) and
+  platform VMs. You can have multiple of each type to support your
+  deployment and cluster them.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNINodes
+
+  Retrieves information about all available nodes.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"}
+
+  Retrieves information about all available nodes, but filter on the collector VMs.
+  #>
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Get a list of available nodes first, this call returns a list of node IDs, which we can use
+  # to retrieve more details on the specific node
+  $nodes = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/infra/nodes"
+
+  # Use this as a result container
+  $nodes_details = [System.Collections.ArrayList]@()
+
+  foreach($node_record in $nodes.results)
+  {
+    # Retrieve the node details and store those
+    $node_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/infra/nodes/$($node_record.id)"
+    $nodes_details.Add($node_info) | Out-Null
+  }
+
+  $nodes_details
+}
+
+function Get-vRNIAPIVersion
+{
+  <#
+  .SYNOPSIS
+  Retrieve the version number of the vRealize Network Insight API.
+
+  .DESCRIPTION
+  The API of vRealize Network Insight is versioned and this retrieves
+  that version number.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIAPIVersion
+
+  Returns the version number of the vRNI API.
+  #>
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $version = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/info/version"
+  $version
+}
+
+#####################################################################################################################
+#####################################################################################################################
+########################################  Datasource Management #####################################################
+#####################################################################################################################
+#####################################################################################################################
 
 function Get-vRNIDataSource
 {
@@ -382,83 +474,11 @@ function Get-vRNIDataSource
   $datasources
 }
 
-
-function Get-vRNIAPIVersion
-{
-  <#
-  .SYNOPSIS
-  Retrieve the version number of the vRealize Network Insight API.
-
-  .DESCRIPTION
-  The API of vRealize Network Insight is versioned and this retrieves
-  that version number.
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIAPIVersion
-
-  Returns the version number of the vRNI API.
-  #>
-  param (
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
-  )
-
-  $version = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/info/version"
-  $version
-}
-
-
-function Get-vRNINodes
-{
-  <#
-  .SYNOPSIS
-  Retrieve details of the vRealize Network Insight nodes.
-
-  .DESCRIPTION
-  Nodes within a vRealize Network Insight typically consist of two
-  node types; collector VMs (or previously know as proxy VMs) and
-  platform VMs. You can have multiple of each type to support your
-  deployment and cluster them.
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNINodes
-
-  Retrieves information about all available nodes.
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"}
-
-  Retrieves information about all available nodes, but filter on the collector VMs.
-  #>
-  param (
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
-  )
-
-  # Get a list of available nodes first, this call returns a list of node IDs, which we can use
-  # to retrieve more details on the specific node
-  $nodes = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/infra/nodes"
-
-  # Use this as a result container
-  $nodes_details = [System.Collections.ArrayList]@()
-
-  foreach($node_record in $nodes.results)
-  {
-    # Retrieve the node details and store those
-    $node_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/infra/nodes/$($node_record.id)"
-    $nodes_details.Add($node_info) | Out-Null
-  }
-
-  $nodes_details
-}
-
+#####################################################################################################################
+#####################################################################################################################
+#######################################  Application Management #####################################################
+#####################################################################################################################
+#####################################################################################################################
 
 function Get-vRNIApplication
 {
