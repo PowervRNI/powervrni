@@ -149,7 +149,7 @@ function Connect-vRNIServer
     [Parameter (Mandatory=$true)]
       # Password to use to login to vRNI
       [ValidateNotNullOrEmpty()]
-      [string]$Password,
+      [Security.SecureString]$Password,
     [Parameter (Mandatory=$false)]
       # Domain to use to login to vRNI (if it's not given, use LOCAL)
       [ValidateNotNullOrEmpty()]
