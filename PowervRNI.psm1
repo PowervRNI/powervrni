@@ -155,7 +155,7 @@ function Invoke-vRNIRestMethod
   catch {
     # Not a webexception (may be on PoSH core), log and throw the underlying ex string
     $ErrorString = "$($MyInvocation.MyCommand.Name) : Exception occured calling invoke-restmethod. $($_.exception.tostring())"
-    throw $_.exception.tostring()
+    throw $ErrorString
   }
 
 
@@ -233,7 +233,7 @@ function Connect-vRNIServer
     [Parameter (Mandatory=$true)]
       # Password to use to login to vRNI
       [ValidateNotNullOrEmpty()]
-      [Security.SecureString]$Password,
+      [string]$Password,
     [Parameter (Mandatory=$false)]
       # Domain to use to login to vRNI (if it's not given, use LOCAL)
       [ValidateNotNullOrEmpty()]
@@ -473,6 +473,131 @@ function Get-vRNIDataSource
   # Return all found data sources
   $datasources
 }
+
+## NOT FINISHED ##
+function New-vRNIDataSource
+{
+  <#
+  .SYNOPSIS
+
+
+  .DESCRIPTION
+
+
+  .EXAMPLE
+
+  PS C:\> New-vRNIDataSource -DatasourceType nsxv -FDQN mgr.nsx.local -Username admin -Nickname mgr.nsx.local -CollectorVMId (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id) -Enabled $True -NSXEnableCentralCLI $True -NSXEnableIPFIX $True -NSXvCenterID (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id)
+
+  Adds a new NSX Manager as a data source, auto select the collector ID (if
+  you only have one), enable the NSX Central CLI for collecting data,
+  also enable NSX IPFIX for
+  #>
+
+  [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
+
+  param (
+    [Parameter (Mandatory=$true)]
+      # Which datasource type to create - TODO: make this a dynamic param to get the values from $Script:data
+      [ValidateSet ("vcenter", "nsxv", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall")]
+      [string]$DatasourceType,
+    [Parameter (Mandatory=$true)]
+      # Username to use to login to the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$Username,
+    [Parameter (Mandatory=$true)]
+      # Password to use to login to the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$Password,
+
+    [Parameter (Mandatory=$false)]
+      # The IP address of the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$IP,
+    [Parameter (Mandatory=$false)]
+      # The FDQN address of the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$FDQN,
+
+    [Parameter (Mandatory=$true)]
+      # Collector (Proxy) Node ID
+      [ValidateNotNullOrEmpty()]
+      [string]$CollectorVMId,
+
+    [Parameter (Mandatory=$true)]
+      # Nickname for the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$Nickname="",
+
+    [Parameter (Mandatory=$false)]
+      # Whether we want to enable the datasource
+      [ValidateNotNullOrEmpty()]
+      [bool]$Enabled=$True,
+    [Parameter (Mandatory=$false)]
+      # Optional notes for the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$Notes="",
+
+    # These params are only required when adding a NSX Manager as datasource
+    [Parameter (Mandatory=$true, ParameterSetName="NSXDS")]
+      # Enable the central CLI collection
+      [ValidateNotNullOrEmpty()]
+      [bool]$NSXEnableCentralCLI,
+
+    [Parameter (Mandatory=$true, ParameterSetName="NSXDS")]
+      # Enable NSX IPFIX as a source
+      [ValidateNotNullOrEmpty()]
+      [bool]$NSXEnableIPFIX,
+
+    [Parameter (Mandatory=$true, ParameterSetName="NSXDS")]
+      # vCenter ID that this NSX Manager will be linked too
+      [ValidateNotNullOrEmpty()]
+      [string]$NSXvCenterID,
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  if($IP -ne "" -And $FDQN -ne "") {
+    throw "Please only provide the FDQN or the IP address for the datasource, not both."
+  }
+
+  # Check if the NSXDS parameter set is used when adding a NSX Manager as datasource
+  if($DatasourceType -eq "nsxv" -And $PSCmdlet.ParameterSetName -ne "NSXDS") {
+    throw "Please provide the NSX parameters when adding a NSX Manager."
+  }
+
+  $requestFormat = @{
+    "ip" = $IP
+    "fqdn" = $FDQN
+    "proxy_id" = $CollectorVMId
+    "nickname" = $Nickname
+    "notes" = $Notes
+    "enabled" = $Enabled
+    "credentials" = @{
+      "username" = $Username
+      "password" = $Password
+    }
+  }
+
+  if($PSCmdlet.ParameterSetName -eq "NSXDS") {
+    $requestFormat.vcenter_id = $NSXvCenterID
+    $requestFormat.ipfix_enabled = $NSXEnableIPFIX
+    $requestFormat.central_cli_enabled = $NSXEnableCentralCLI
+  }
+
+  # Convert the hash to JSON and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  Write-Host $Script:DatasourceURLs.$DatasourceType[0]
+  $URI = "/api/ni$($Script:DatasourceURLs.$DatasourceType[0])"
+
+  $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI -Body $requestBody
+
+  $response
+
+}
+
 
 #####################################################################################################################
 #####################################################################################################################
