@@ -431,7 +431,7 @@ function Get-vRNIDataSource
 
   .EXAMPLE
 
-  PS C:\> Get-vRNIDataSource -DatasourceType nsxv
+  PS C:\> Get-vRNIDataSource -DataSourceType nsxv
 
   Retrieves the defaults of all NSX Managers added to vRNI as a datasource.
   #>
@@ -439,7 +439,7 @@ function Get-vRNIDataSource
     [Parameter (Mandatory=$false)]
       # Which datasource type to get - TODO: make this a dynamic param to get the values from $Script:data
       [ValidateSet ("vcenter", "nsxv", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall", "all")]
-      [string]$DatasourceType="all",
+      [string]$DataSourceType="all",
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
       [ValidateNotNullOrEmpty()]
@@ -451,7 +451,7 @@ function Get-vRNIDataSource
 
   # Because each datasource type has its unique URL (/api/ni/data-sources/vcenter, /data-sources/ucs-manager, etc),
   # and we want all the datasource information, loop through the URLs of the types we want to retrieve and
-  $datasource_types_to_get = $Script:DatasourceURLs.$DatasourceType
+  $datasource_types_to_get = $Script:DatasourceURLs.$DataSourceType
   foreach($datasource_uri in $datasource_types_to_get)
   {
     # Energize!
@@ -492,7 +492,7 @@ function New-vRNIDataSource
   .EXAMPLE
 
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
-  PS C:\> New-vRNIDataSource -DatasourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password secret -CollectorVMId $collectorId -Nickname vc.nsx.local 
+  PS C:\> New-vRNIDataSource -DataSourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password secret -CollectorVMId $collectorId -Nickname vc.nsx.local 
 
   First, get the node ID of the collector VM (assuming there's only one), then
   add a vCenter located at vc.nsx.local to vRNI. 
@@ -501,7 +501,7 @@ function New-vRNIDataSource
 
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
   PS C:\> $vcId = (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id)
-  PS C:\> New-vRNIDataSource -DatasourceType nsxv -FDQN mgr.nsx.local -Username admin -Password secret -Nickname mgr.nsx.local -CollectorVMId $collectorId -Enabled $True -NSXEnableCentralCLI $True -NSXEnableIPFIX $True -NSXvCenterID $vcId
+  PS C:\> New-vRNIDataSource -DataSourceType nsxv -FDQN mgr.nsx.local -Username admin -Password secret -Nickname mgr.nsx.local -CollectorVMId $collectorId -Enabled $True -NSXEnableCentralCLI $True -NSXEnableIPFIX $True -NSXvCenterID $vcId
 
   Adds a new NSX Manager as a data source, auto select the collector ID (if
   you only have one), enable the NSX Central CLI for collecting data,
@@ -515,7 +515,7 @@ function New-vRNIDataSource
     [Parameter (Mandatory=$true)]
       # Which datasource type to create - TODO: make this a dynamic param to get the values from $Script:data
       [ValidateSet ("vcenter", "nsxv", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall")]
-      [string]$DatasourceType,
+      [string]$DataSourceType,
     [Parameter (Mandatory=$true)]
       # Username to use to login to the datasource
       [ValidateNotNullOrEmpty()]
@@ -592,15 +592,15 @@ function New-vRNIDataSource
   }
 
   # Check if the NSXDS parameter set is used when adding a NSX Manager as datasource
-  if($DatasourceType -eq "nsxv" -And $PSCmdlet.ParameterSetName -ne "NSXDS") {
+  if($DataSourceType -eq "nsxv" -And $PSCmdlet.ParameterSetName -ne "NSXDS") {
     throw "Please provide the NSX parameters when adding a NSX Manager."
   }
 
   # Check if the switch type is provided, when adding a Cisco of Dell switch
-  if($DatasourceType -eq "ciscoswitch" -And $PSCmdlet.ParameterSetName -ne "CISCOSWITCH") {
+  if($DataSourceType -eq "ciscoswitch" -And $PSCmdlet.ParameterSetName -ne "CISCOSWITCH") {
     throw "Please provide the -CiscoSwitchType parameter when adding a Cisco switch."
   }
-  if($DatasourceType -eq "dellswitch" -And $PSCmdlet.ParameterSetName -ne "DELLSWITCH") {
+  if($DataSourceType -eq "dellswitch" -And $PSCmdlet.ParameterSetName -ne "DELLSWITCH") {
     throw "Please provide the -DellSwitchType parameter when adding a Dell switch."
   }
 
@@ -627,12 +627,66 @@ function New-vRNIDataSource
 
   # Convert the hash to JSON, form the URI and send the request to vRNI
   $requestBody = ConvertTo-Json $requestFormat
-  $URI = "/api/ni$($Script:DatasourceURLs.$DatasourceType[0])"
+  $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])"
 
   $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI -Body $requestBody
   $response
 }
 
+
+function Remove-vRNIDataSource
+{
+  <#
+  .SYNOPSIS
+  Removes a datasource from vRealize Network Insight
+
+  .DESCRIPTION
+  Datasources within vRealize Network Insight provide the data shown in
+  the UI. The vRNI Collectors periodically polls the datasources as the
+  source of truth. Typically you have a vCenter, NSX Manager and physical
+  switches as the datasource.
+
+  This cmdlet removes a datasources from vRNI.
+
+  .EXAMPLE
+
+  PS C:\> Remove-vRNIDataSource -DataSourceType vcenter -DataSourceId (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id) 
+
+  Removes a vCenter datasource with the nickname "vc.nsx.local"
+
+  .EXAMPLE
+
+  PS C:\> Remove-vRNIDataSource -DataSourceType nsxv -DataSourceId (Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Select -ExpandProperty entity_id)                       
+
+  Removes a NSX Manager datasource with the nickname "manager.nsx.local"
+
+  #>
+
+  param (
+    [Parameter (Mandatory=$true)]
+      # Which datasource type to create - TODO: make this a dynamic param to get the values from $Script:data
+      [ValidateSet ("vcenter", "nsxv", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall")]
+      [string]$DataSourceType,
+
+    [Parameter (Mandatory=$true)]
+      # Datasource ID, gotten from Get-vRNIDataSource - TODO: allow this (and the ds type) to be given through the pipeline
+      [ValidateNotNullOrEmpty()]
+      [string]$DataSourceId,
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+
+  # All we have to do is to send a DELETE request to URI /api/ni/$DataSourceType/$DatasourceId, so
+  # form the URI and send the DELETE request to vRNI
+  $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])/$($DataSourceId)"
+
+  $response = Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri $URI
+  $response
+}
 
 #####################################################################################################################
 #####################################################################################################################
