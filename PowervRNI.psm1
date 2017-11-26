@@ -23,6 +23,20 @@ $Script:DatasourceURLs.Add("checkpointfirewall", @("/data-sources/checkpoint-fir
 $Script:DatasourceURLs.Add("panfirewall", @("/data-sources/panorama-firewalls"))
 $Script:DatasourceURLs.Add("all", @("/data-sources/vcenters", "/data-sources/nsxv-managers", "/data-sources/cisco-switches", "/data-sources/arista-switches", "/data-sources/dell-switches", "/data-sources/brocade-switches", "/data-sources/juniper-switches", "/data-sources/ucs-managers", "/data-sources/hpov-managers", "/data-sources/hpvc-managers", "/data-sources/checkpoint-firewalls", "/data-sources/panorama-firewalls"))
 
+# Keep another list handy which translates the internal vRNI Names for datasources to their relative URLs
+$Script:DatasourceInternalURLs = @{}
+$Script:DatasourceInternalURLs.Add("VCenterDataSource", "/data-sources/vcenters")
+$Script:DatasourceInternalURLs.Add("NSXVManagerDataSource", "/data-sources/nsxv-managers")
+$Script:DatasourceInternalURLs.Add("CiscoSwitchDataSource", "/data-sources/cisco-switches")
+$Script:DatasourceInternalURLs.Add("AristaSwitchDataSource", "/data-sources/arista-switches")
+$Script:DatasourceInternalURLs.Add("DellSwitchDataSource", "/data-sources/dell-switches")
+$Script:DatasourceInternalURLs.Add("BrocadeSwitchDataSource", "/data-sources/brocade-switches")
+$Script:DatasourceInternalURLs.Add("JuniperSwitchDataSource", "/data-sources/juniper-switches")
+$Script:DatasourceInternalURLs.Add("UCSManagerDataSource", "/data-sources/ucs-managers")
+$Script:DatasourceInternalURLs.Add("HPOneViewManagerDataSource", "/data-sources/hpov-managers")
+$Script:DatasourceInternalURLs.Add("HPVCManagerDataSource", "/data-sources/hpvc-managers")
+$Script:DatasourceInternalURLs.Add("CheckpointFirewallDataSource", "/data-sources/checkpoint-firewalls")
+$Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panorama-firewalls")
 
 
 function Invoke-vRNIRestMethod
@@ -649,28 +663,23 @@ function Remove-vRNIDataSource
 
   .EXAMPLE
 
-  PS C:\> Remove-vRNIDataSource -DataSourceType vcenter -DataSourceId (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id) 
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Remove-vRNIDataSource
 
   Removes a vCenter datasource with the nickname "vc.nsx.local"
 
   .EXAMPLE
 
-  PS C:\> Remove-vRNIDataSource -DataSourceType nsxv -DataSourceId (Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Select -ExpandProperty entity_id)                       
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Remove-vRNIDataSource
 
   Removes a NSX Manager datasource with the nickname "manager.nsx.local"
 
   #>
 
   param (
-    [Parameter (Mandatory=$true)]
-      # Which datasource type to create - TODO: make this a dynamic param to get the values from $Script:data
-      [ValidateSet ("vcenter", "nsxv", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall")]
-      [string]$DataSourceType,
-
-    [Parameter (Mandatory=$true)]
-      # Datasource ID, gotten from Get-vRNIDataSource - TODO: allow this (and the ds type) to be given through the pipeline
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNIDataSource
       [ValidateNotNullOrEmpty()]
-      [string]$DataSourceId,
+      [PSObject]$DataSource,
 
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
@@ -681,7 +690,7 @@ function Remove-vRNIDataSource
 
   # All we have to do is to send a DELETE request to URI /api/ni/$DataSourceType/$DatasourceId, so
   # form the URI and send the DELETE request to vRNI
-  $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])/$($DataSourceId)"
+  $URI = "/api/ni$($Script:DatasourceInternalURLs.$($DataSource.entity_type))/$($DataSource.entity_id)"
 
   $response = Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri $URI
   $response
@@ -703,28 +712,23 @@ function Enable-vRNIDataSource
 
   .EXAMPLE
 
-  PS C:\> Enable-vRNIDataSource -DataSourceType vcenter -DataSourceId (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id) 
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Enable-vRNIDataSource
 
   Enables a vCenter datasource with the nickname "vc.nsx.local"
 
   .EXAMPLE
 
-  PS C:\> Enable-vRNIDataSource -DataSourceType nsxv -DataSourceId (Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Select -ExpandProperty entity_id)                       
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Enable-vRNIDataSource
 
-  Enabled a NSX Manager datasource with the nickname "manager.nsx.local"
+  Enables a NSX Manager datasource with the nickname "manager.nsx.local"
 
   #>
 
   param (
-    [Parameter (Mandatory=$true)]
-      # Which datasource type to create - TODO: make this a dynamic param to get the values from $Script:data
-      [ValidateSet ("vcenter", "nsxv", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall")]
-      [string]$DataSourceType,
-
-    [Parameter (Mandatory=$true)]
-      # Datasource ID, gotten from Get-vRNIDataSource - TODO: allow this (and the ds type) to be given through the pipeline
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNIDataSource
       [ValidateNotNullOrEmpty()]
-      [string]$DataSourceId,
+      [PSObject]$DataSource,
 
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
@@ -735,7 +739,7 @@ function Enable-vRNIDataSource
 
   # All we have to do is to send a POST request to URI /api/ni/$DataSourceType/$DatasourceId/enable, so
   # form the URI and send the request to vRNI
-  $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])/$($DataSourceId)/enable"
+  $URI = "/api/ni$($Script:DatasourceInternalURLs.$($DataSource.entity_type))/$($DataSource.entity_id)/enable"
 
   $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI
   $response
@@ -757,28 +761,23 @@ function Disable-vRNIDataSource
 
   .EXAMPLE
 
-  PS C:\> Disable-vRNIDataSource -DataSourceType vcenter -DataSourceId (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id) 
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Disable-vRNIDataSource
 
   Disables a vCenter datasource with the nickname "vc.nsx.local"
 
   .EXAMPLE
 
-  PS C:\> Disable-vRNIDataSource -DataSourceType nsxv -DataSourceId (Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Select -ExpandProperty entity_id)                       
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Disable-vRNIDataSource
 
   Disables a NSX Manager datasource with the nickname "manager.nsx.local"
 
   #>
 
   param (
-    [Parameter (Mandatory=$true)]
-      # Which datasource type to create - TODO: make this a dynamic param to get the values from $Script:data
-      [ValidateSet ("vcenter", "nsxv", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall")]
-      [string]$DataSourceType,
-
-    [Parameter (Mandatory=$true)]
-      # Datasource ID, gotten from Get-vRNIDataSource - TODO: allow this (and the ds type) to be given through the pipeline
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNIDataSource
       [ValidateNotNullOrEmpty()]
-      [string]$DataSourceId,
+      [PSObject]$DataSource,
 
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
@@ -789,7 +788,7 @@ function Disable-vRNIDataSource
 
   # All we have to do is to send a POST request to URI /api/ni/$DataSourceType/$DatasourceId/disable, so
   # form the URI and send the request to vRNI
-  $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])/$($DataSourceId)/disable"
+  $URI = "/api/ni$($Script:DatasourceInternalURLs.$($DataSource.entity_type))/$($DataSource.entity_id)/disable"
 
   $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI
   $response
