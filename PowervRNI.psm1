@@ -633,7 +633,6 @@ function New-vRNIDataSource
   $response
 }
 
-
 function Remove-vRNIDataSource
 {
   <#
@@ -685,6 +684,114 @@ function Remove-vRNIDataSource
   $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])/$($DataSourceId)"
 
   $response = Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri $URI
+  $response
+}
+
+function Enable-vRNIDataSource
+{
+  <#
+  .SYNOPSIS
+  Enables an existing datasources within vRealize Network Insight
+
+  .DESCRIPTION
+  Datasources within vRealize Network Insight provide the data shown in
+  the UI. The vRNI Collectors periodically polls the datasources as the
+  source of truth. Typically you have a vCenter, NSX Manager and physical
+  switches as the datasource.
+
+  This cmdlet enables an existing datasources within vRNI.
+
+  .EXAMPLE
+
+  PS C:\> Enable-vRNIDataSource -DataSourceType vcenter -DataSourceId (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id) 
+
+  Enables a vCenter datasource with the nickname "vc.nsx.local"
+
+  .EXAMPLE
+
+  PS C:\> Enable-vRNIDataSource -DataSourceType nsxv -DataSourceId (Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Select -ExpandProperty entity_id)                       
+
+  Enabled a NSX Manager datasource with the nickname "manager.nsx.local"
+
+  #>
+
+  param (
+    [Parameter (Mandatory=$true)]
+      # Which datasource type to create - TODO: make this a dynamic param to get the values from $Script:data
+      [ValidateSet ("vcenter", "nsxv", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall")]
+      [string]$DataSourceType,
+
+    [Parameter (Mandatory=$true)]
+      # Datasource ID, gotten from Get-vRNIDataSource - TODO: allow this (and the ds type) to be given through the pipeline
+      [ValidateNotNullOrEmpty()]
+      [string]$DataSourceId,
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+
+  # All we have to do is to send a POST request to URI /api/ni/$DataSourceType/$DatasourceId/enable, so
+  # form the URI and send the request to vRNI
+  $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])/$($DataSourceId)/enable"
+
+  $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI
+  $response
+}
+
+function Disable-vRNIDataSource
+{
+  <#
+  .SYNOPSIS
+  Disables an existing datasources within vRealize Network Insight
+
+  .DESCRIPTION
+  Datasources within vRealize Network Insight provide the data shown in
+  the UI. The vRNI Collectors periodically polls the datasources as the
+  source of truth. Typically you have a vCenter, NSX Manager and physical
+  switches as the datasource.
+
+  This cmdlet disables an existing datasources within vRNI.
+
+  .EXAMPLE
+
+  PS C:\> Disable-vRNIDataSource -DataSourceType vcenter -DataSourceId (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id) 
+
+  Disables a vCenter datasource with the nickname "vc.nsx.local"
+
+  .EXAMPLE
+
+  PS C:\> Disable-vRNIDataSource -DataSourceType nsxv -DataSourceId (Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Select -ExpandProperty entity_id)                       
+
+  Disables a NSX Manager datasource with the nickname "manager.nsx.local"
+
+  #>
+
+  param (
+    [Parameter (Mandatory=$true)]
+      # Which datasource type to create - TODO: make this a dynamic param to get the values from $Script:data
+      [ValidateSet ("vcenter", "nsxv", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall")]
+      [string]$DataSourceType,
+
+    [Parameter (Mandatory=$true)]
+      # Datasource ID, gotten from Get-vRNIDataSource - TODO: allow this (and the ds type) to be given through the pipeline
+      [ValidateNotNullOrEmpty()]
+      [string]$DataSourceId,
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+
+  # All we have to do is to send a POST request to URI /api/ni/$DataSourceType/$DatasourceId/disable, so
+  # form the URI and send the request to vRNI
+  $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])/$($DataSourceId)/disable"
+
+  $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI
   $response
 }
 
