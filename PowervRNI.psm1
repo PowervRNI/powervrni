@@ -474,23 +474,39 @@ function Get-vRNIDataSource
   $datasources
 }
 
-## NOT FINISHED ##
 function New-vRNIDataSource
 {
   <#
   .SYNOPSIS
-
+  Create new datasources within vRealize Network Insight to retrieve data from.
 
   .DESCRIPTION
+  Datasources within vRealize Network Insight provide the data shown in
+  the UI. The vRNI Collectors periodically polls the datasources as the
+  source of truth. Typically you have a vCenter, NSX Manager and physical
+  switches as the datasource.
 
+  This cmdlet adds new datasources to vRNI, so it can retrieve data from it and
+  correlate and display this data in the interfce.
 
   .EXAMPLE
 
-  PS C:\> New-vRNIDataSource -DatasourceType nsxv -FDQN mgr.nsx.local -Username admin -Nickname mgr.nsx.local -CollectorVMId (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id) -Enabled $True -NSXEnableCentralCLI $True -NSXEnableIPFIX $True -NSXvCenterID (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id)
+  PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
+  PS C:\> New-vRNIDataSource -DatasourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password secret -CollectorVMId $collectorId -Nickname vc.nsx.local 
+
+  First, get the node ID of the collector VM (assuming there's only one), then
+  add a vCenter located at vc.nsx.local to vRNI. 
+
+  .EXAMPLE
+
+  PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
+  PS C:\> $vcId = (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id)
+  PS C:\> New-vRNIDataSource -DatasourceType nsxv -FDQN mgr.nsx.local -Username admin -Password secret -Nickname mgr.nsx.local -CollectorVMId $collectorId -Enabled $True -NSXEnableCentralCLI $True -NSXEnableIPFIX $True -NSXvCenterID $vcId
 
   Adds a new NSX Manager as a data source, auto select the collector ID (if
   you only have one), enable the NSX Central CLI for collecting data,
-  also enable NSX IPFIX for
+  also enable NSX IPFIX for network datastream insight from the point of view
+  of NSX.
   #>
 
   [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
@@ -553,6 +569,18 @@ function New-vRNIDataSource
       [ValidateNotNullOrEmpty()]
       [string]$NSXvCenterID,
 
+    # This params is only required when adding a cisco switch
+    [Parameter (Mandatory=$true, ParameterSetName="CISCOSWITCH")]
+      # Set the switch type
+      [ValidateSet ("CATALYST_3000", "CATALYST_4500", "CATALYST_6500", "NEXUS_5K", "NEXUS_7K", "NEXUS_9K")]
+      [string]$CiscoSwitchType,
+
+    # This params is only required when adding a dell switch
+    [Parameter (Mandatory=$true, ParameterSetName="DELLSWITCH")]
+      # Set the switch type
+      [ValidateSet ("FORCE_10_MXL_10", "POWERCONNECT_8024", "S4048", "Z9100", "S6000")]
+      [string]$DellSwitchType,
+
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
       [ValidateNotNullOrEmpty()]
@@ -568,6 +596,15 @@ function New-vRNIDataSource
     throw "Please provide the NSX parameters when adding a NSX Manager."
   }
 
+  # Check if the switch type is provided, when adding a Cisco of Dell switch
+  if($DatasourceType -eq "ciscoswitch" -And $PSCmdlet.ParameterSetName -ne "CISCOSWITCH") {
+    throw "Please provide the -CiscoSwitchType parameter when adding a Cisco switch."
+  }
+  if($DatasourceType -eq "dellswitch" -And $PSCmdlet.ParameterSetName -ne "DELLSWITCH") {
+    throw "Please provide the -DellSwitchType parameter when adding a Dell switch."
+  }
+
+  # Format request with all given data
   $requestFormat = @{
     "ip" = $IP
     "fqdn" = $FDQN
@@ -581,21 +618,19 @@ function New-vRNIDataSource
     }
   }
 
+  # If we're adding a NSX Manager, also add the NSX parameters to the body
   if($PSCmdlet.ParameterSetName -eq "NSXDS") {
     $requestFormat.vcenter_id = $NSXvCenterID
     $requestFormat.ipfix_enabled = $NSXEnableIPFIX
     $requestFormat.central_cli_enabled = $NSXEnableCentralCLI
   }
 
-  # Convert the hash to JSON and send the request to vRNI
+  # Convert the hash to JSON, form the URI and send the request to vRNI
   $requestBody = ConvertTo-Json $requestFormat
-  Write-Host $Script:DatasourceURLs.$DatasourceType[0]
   $URI = "/api/ni$($Script:DatasourceURLs.$DatasourceType[0])"
 
   $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI -Body $requestBody
-
   $response
-
 }
 
 
