@@ -847,3 +847,99 @@ function Get-vRNIApplication
 
   $applications
 }
+
+#####################################################################################################################
+#####################################################################################################################
+#########################################  Entity Management ########################################################
+#####################################################################################################################
+#####################################################################################################################
+
+
+function Get-vRNIProblem
+{
+  <#
+  .SYNOPSIS
+  Get open problems from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRNI checks for problems in your environment and displays or alerts you
+  about these problems. These problems can have multiple causes; for example
+  latency issues with NSX Controllers, a configuration issue on the VDS, etc.
+  In the end you're supposed to solve these problems and have no open ones.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIProblem
+
+  Get a list of all open problems
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIProblem | Where {$_.severity -eq "CRITICAL"}
+
+  Get a list of all open problems which have the CRITICAL severity (and are
+  probably important to solve quickly)
+
+  #>
+  param (
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Use this as a results container
+  $problems = [System.Collections.ArrayList]@()
+
+  # vRNI uses a paging system with (by default) 10 items per page. These vars are to keep track of the pages and retrieve what's left
+  $size = 10
+  $total_count = 0
+  $current_count = 0
+  $cursor = ""
+  $finished = $false
+
+  while(!$finished)
+  {
+    if($size -lt 10) {
+      $finished = $true
+    }
+
+    # This is the base URI for the problems 
+    $URI = "/api/ni/entities/problems"
+    if($size -gt 0 -And $cursor -ne "") {
+      $URI += "?size=$($size)&cursor=$($cursor)"
+    }
+
+    Write-Debug "Using URI: $($URI)"
+
+    # Get a list of all problems
+    $problem_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
+
+    # If we're not finished, store information about the run for next use
+    if($finished -eq $false)
+    {
+      $total_count = $problem_list.total_count
+      $cursor      = $problem_list.cursor
+
+      $current_count += $problem_list.results.count
+
+      # Check remaining items, if it's less than the default size, reduce the next page size
+      if($size -gt ($total_count - $current_count)) {
+        $size = ($total_count - $current_count)
+      }
+    }
+  
+    # Go through the problems individually and store them in the results array
+    foreach($problem in $problem_list.results)
+    {
+      # Retrieve application details and store them
+      $problem_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/problems/$($problem.entity_id)"
+      $problems.Add($problem_info) | Out-Null
+      Start-Sleep -m 100
+    }
+  }
+
+  $problems
+}
+
