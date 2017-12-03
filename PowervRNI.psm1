@@ -882,7 +882,9 @@ function Get-vRNIProblem
 
   #>
   param (
-
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
       [ValidateNotNullOrEmpty()]
@@ -921,13 +923,6 @@ function Get-vRNIProblem
     {
       $total_count = $problem_list.total_count
       $cursor      = $problem_list.cursor
-
-      $current_count += $problem_list.results.count
-
-      # Check remaining items, if it's less than the default size, reduce the next page size
-      if($size -gt ($total_count - $current_count)) {
-        $size = ($total_count - $current_count)
-      }
     }
   
     # Go through the problems individually and store them in the results array
@@ -936,10 +931,162 @@ function Get-vRNIProblem
       # Retrieve application details and store them
       $problem_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/problems/$($problem.entity_id)"
       $problems.Add($problem_info) | Out-Null
+      # Don't overload the API, pause a bit
       Start-Sleep -m 100
+
+      $current_count++
+      
+      # If we are limiting the output, break from the loops and return results
+      if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
+        $finished = $true
+        break
+      }
+    }
+    # Check remaining items, if it's less than the default size, reduce the next page size
+    if($size -gt ($total_count - $current_count)) {
+      $size = ($total_count - $current_count)
     }
   }
 
   $problems
+}
+
+
+function Get-vRNIFlow
+{
+  <#
+  .SYNOPSIS
+  Get network flows from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRNI can ingest NetFlow and IPFIX data from the vSphere Distributed 
+  Switch and physical switches which support NetFlow v5, v7, v9 or IPFIX.
+  This cmdlet will let you export these flows 
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIFlow
+
+  Get the last 100 flows (100 = default)
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIFlow -Limit 10
+
+  Get the last 10 flows
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIFlow -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds())
+
+  Get all flows that occurred in the last 10 minutes. 
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIFlow -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()) | Where {$_.protocol -eq "TCP"}
+
+  Get all flows that occurred in the last 10 minutes and ignore all flows
+  that are not TCP based.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 100,
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to start looking up records
+      [int]$StartTime = 0,
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to stop looking up records
+      [int]$EndTime = 0,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # If we want to select flows in a time slot, make sure the end time is later then the start time
+  if($PSCmdlet.ParameterSetName -eq "TIMELIMIT") {
+    if($StartTime -gt $EndTime) {
+      throw "Param StartTime cannot be greater than EndTime"
+    }
+  }
+
+  # Use this as a results container
+  $flows = [System.Collections.ArrayList]@()
+
+  # vRNI uses a paging system with (by default) 10 items per page. These vars are to keep track of the pages and retrieve what's left
+  $size = 10
+  $total_count = 0
+  $current_count = 0
+  $cursor = ""
+  $finished = $false
+
+  while(!$finished)
+  {
+    if($size -lt 10) {
+      $finished = $true
+    }
+
+    $using_params = 0
+    # This is the base URI for the problems 
+    $URI = "/api/ni/entities/flows"
+    if($size -gt 0 -And $cursor -ne "") {
+      $URI += "?size=$($size)&cursor=$($cursor)"
+      $using_params++
+    }
+
+    # TODO: Troubleshoot this with VMware vRNI team - the API does not seem to honour the time window!
+    # Check if we want to limit the results to a time window
+    if($PSCmdlet.ParameterSetName -eq "TIMELIMIT") {
+      if($using_params -gt 0) {
+        $URI += "&start_time=$($StartTime)&end_time=$($EndTime)"
+        $using_params++
+      }
+      else {
+        $URI += "?start_time=$($StartTime)&end_time=$($EndTime)"
+        $using_params++
+      }
+    }
+
+    Write-Debug "Using URI: $($URI)"
+
+    # Get a list of all problems
+    $flow_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
+
+    # If we're not finished, store information about the run for next use
+    if($finished -eq $false)
+    {
+      $total_count = $flow_list.total_count
+      $cursor      = $flow_list.cursor
+    }
+  
+    # Go through the problems individually and store them in the results array
+    foreach($flow in $flow_list.results)
+    {
+      # Retrieve application details and store them
+      $flow_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/flows/$($flow.entity_id)"
+      #$flow_info.time = $flow.time
+      $flow_info | Add-Member -Name "time" -value $flow.time -MemberType NoteProperty
+      $flows.Add($flow_info) | Out-Null
+      # Don't overload the API, pause a bit
+      Start-Sleep -m 100
+
+      $current_count++
+
+      # If we are limiting the output, break from the loops and return results
+      if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
+        $finished = $true
+        break
+      }
+    }
+
+    # Check remaining items, if it's less than the default size, reduce the next page size
+    if($size -gt ($total_count - $current_count)) {
+      $size = ($total_count - $current_count)
+    }
+  }
+
+  $flows
 }
 
