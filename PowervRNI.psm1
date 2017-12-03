@@ -903,10 +903,6 @@ function Get-vRNIProblem
 
   while(!$finished)
   {
-    if($size -lt 10) {
-      $finished = $true
-    }
-
     # This is the base URI for the problems 
     $URI = "/api/ni/entities/problems"
     if($size -gt 0 -And $cursor -ne "") {
@@ -923,6 +919,10 @@ function Get-vRNIProblem
     {
       $total_count = $problem_list.total_count
       $cursor      = $problem_list.cursor
+    }
+    # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
+    if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
+      $finished = $true
     }
   
     # Go through the problems individually and store them in the results array
@@ -959,7 +959,7 @@ function Get-vRNIFlow
   Get network flows from vRealize Network Insight.
 
   .DESCRIPTION
-  vRNI can ingest NetFlow and IPFIX data from the vSphere Distributed 
+  vRNI can consume NetFlow and IPFIX data from the vSphere Distributed 
   Switch and physical switches which support NetFlow v5, v7, v9 or IPFIX.
   This cmdlet will let you export these flows 
 
@@ -1024,10 +1024,6 @@ function Get-vRNIFlow
 
   while(!$finished)
   {
-    if($size -lt 10) {
-      $finished = $true
-    }
-
     $using_params = 0
     # This is the base URI for the problems 
     $URI = "/api/ni/entities/flows"
@@ -1060,6 +1056,11 @@ function Get-vRNIFlow
       $total_count = $flow_list.total_count
       $cursor      = $flow_list.cursor
     }
+
+    # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
+    if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
+      $finished = $true
+    }
   
     # Go through the problems individually and store them in the results array
     foreach($flow in $flow_list.results)
@@ -1090,3 +1091,221 @@ function Get-vRNIFlow
   $flows
 }
 
+
+function Get-vRNIVM
+{
+  <#
+  .SYNOPSIS
+  Get virtual machines from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all VMs in your environment
+  and this cmdlet will help you discover these VMs.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIVM
+
+  List all VMs in your vRNI environment (note: this may take a while if you 
+  have a lot of VMs)
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIVM -Name my-vm-name
+
+  Retrieve only the VM object called "my-vm-name"
+
+  .EXAMPLE
+
+  PS C:\> $vcenter_entity_id = (Get-vRNIvCenter | Where {$_.name -eq "vcenter.lab"}).entity_id                                                                                   
+  PS C:\> Get-vRNIVM | Where {$_.vcenter_manager.entity_id -eq $vcenter_entity_id}    
+
+  Get all VMs that are attached to the vCenter named "vcenter.lab"
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Use this as a results container
+  $vms = [System.Collections.ArrayList]@()
+
+  # vRNI uses a paging system with (by default) 10 items per page. These vars are to keep track of the pages and retrieve what's left
+  $size = 10
+  $total_count = 0
+  $current_count = 0
+  $cursor = ""
+  $finished = $false
+
+  while(!$finished)
+  {
+    # This is the base URI for the problems 
+    $URI = "/api/ni/entities/vms"
+    if($size -gt 0 -And $cursor -ne "") {
+      $URI += "?size=$($size)&cursor=$($cursor)"
+    }
+
+    Write-Debug "Using URI: $($URI)"
+
+    # Get a list of all problems
+    $vm_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
+
+    # If we're not finished, store information about the run for next use
+    if($finished -eq $false)
+    {
+      $total_count = $vm_list.total_count
+      $cursor      = $vm_list.cursor
+    }
+    # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
+    if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
+      $finished = $true
+    }
+  
+    # Go through the problems individually and store them in the results array
+    foreach($vm in $vm_list.results)
+    {
+      # Retrieve application details and store them
+      $vm_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/vms/$($vm.entity_id)"
+      $vms.Add($vm_info) | Out-Null
+      # Don't overload the API, pause a bit
+      Start-Sleep -m 100
+
+      $current_count++
+      
+      # If we are limiting the output, break from the loops and return results
+      if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
+        $finished = $true
+        break
+      }
+    }
+    # Check remaining items, if it's less than the default size, reduce the next page size
+    if($size -gt ($total_count - $current_count)) {
+      $size = ($total_count - $current_count)
+    }
+    
+  }
+
+  if ($Name) {
+    $vms | Where-Object { $_.name -eq $Name }
+  } 
+  else {
+    $vms
+  }
+}
+
+function Get-vRNIvCenter
+{
+  <#
+  .SYNOPSIS
+  Get configured vCenter instances from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all vCenters in your environment
+  and this cmdlet will help you discover these vCenters.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIvCenter
+
+  Get all vCenters in the vRNI environment.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIvCenter vcenter.lab
+
+  Retrieve the vCenter object for the one called "vcenter.lab"
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Use this as a results container
+  $vcenters = [System.Collections.ArrayList]@()
+
+  # vRNI uses a paging system with (by default) 10 items per page. These vars are to keep track of the pages and retrieve what's left
+  $size = 10
+  $total_count = 0
+  $current_count = 0
+  $cursor = ""
+  $finished = $false
+
+  while(!$finished)
+  {
+    # This is the base URI for the problems 
+    $URI = "/api/ni/entities/vcenter-managers"
+    if($size -gt 0 -And $cursor -ne "") {
+      $URI += "?size=$($size)&cursor=$($cursor)"
+    }
+
+    Write-Debug "Using URI: $($URI)"
+
+    # Get a list of all problems
+    $vcenter_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
+
+    # If we're not finished, store information about the run for next use
+    if($finished -eq $false)
+    {
+      $total_count = $vcenter_list.total_count
+      $cursor      = $vcenter_list.cursor
+    }
+
+    # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
+    if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
+      $finished = $true
+    }
+  
+    # Go through the problems individually and store them in the results array
+    foreach($vcenter in $vcenter_list.results)
+    {
+      # Retrieve application details and store them
+      $vcenter_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/vcenter-managers/$($vcenter.entity_id)"
+      $vcenters.Add($vcenter_info) | Out-Null
+
+      if($Name -eq $vcenter_info.name) {
+        $finished = true
+        break
+      }
+      # Don't overload the API, pause a bit
+      Start-Sleep -m 100
+
+      $current_count++
+      
+      # If we are limiting the output, break from the loops and return results
+      if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
+        $finished = $true
+        break
+      }
+    }
+    # Check remaining items, if it's less than the default size, reduce the next page size
+    if($size -gt ($total_count - $current_count)) {
+      $size = ($total_count - $current_count)
+    }
+    
+  }
+
+  if ($Name) {
+    $vcenters | Where-Object { $_.name -eq $Name }
+  } 
+  else {
+    $vcenters
+  }
+}
