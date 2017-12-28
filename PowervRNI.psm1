@@ -173,6 +173,7 @@ function Invoke-vRNIRestMethod
   }
 
 
+  Write-Debug "$(Get-Date -format s) Invoke-RestMethod Result: $response"
 
   # Workaround for bug in invoke-restmethod where it doesnt complete the tcp session close to our server after certain calls.
   # We end up with connectionlimit number of tcp sessions in close_wait and future calls die with a timeout failure.
@@ -880,11 +881,23 @@ function Get-vRNIProblem
   Get a list of all open problems which have the CRITICAL severity (and are
   probably important to solve quickly)
 
+  .EXAMPLE
+
+  PS C:\> Get-vRNIProblem -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds())
+
+  Get all problems that have been open in the last 10 minutes. 
+
   #>
   param (
     [Parameter (Mandatory=$false)]
       # Limit the amount of records returned
       [int]$Limit = 0,
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to start looking up records
+      [int]$StartTime = 0,
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to stop looking up records
+      [int]$EndTime = 0,
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
       [ValidateNotNullOrEmpty()]
@@ -903,10 +916,25 @@ function Get-vRNIProblem
 
   while(!$finished)
   {
+    $using_params = 0
     # This is the base URI for the problems 
     $URI = "/api/ni/entities/problems"
     if($size -gt 0 -And $cursor -ne "") {
       $URI += "?size=$($size)&cursor=$($cursor)"
+      $using_params++
+    }
+
+    # Check if we want to limit the results to a time window
+    if($PSCmdlet.ParameterSetName -eq "TIMELIMIT") 
+    {
+      if($using_params -gt 0) {
+        $URI += "&start_time=$($StartTime)&end_time=$($EndTime)"
+        $using_params++
+      }
+      else {
+        $URI += "?start_time=$($StartTime)&end_time=$($EndTime)"
+        $using_params++
+      }
     }
 
     Write-Debug "Using URI: $($URI)"
@@ -929,7 +957,7 @@ function Get-vRNIProblem
     foreach($problem in $problem_list.results)
     {
       # Retrieve application details and store them
-      $problem_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/problems/$($problem.entity_id)"
+      $problem_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/problems/$($problem.entity_id)?time=$($problem.time)"
       $problems.Add($problem_info) | Out-Null
       # Don't overload the API, pause a bit
       Start-Sleep -m 100
@@ -1032,7 +1060,10 @@ function Get-vRNIFlow
       $using_params++
     }
 
-    # TODO: Troubleshoot this with VMware vRNI team - the API does not seem to honour the time window!
+    # NOTE: The time window returns flows that have been active in that specific time window. It might be the case that
+    # the flow itself was created earlier then given time window and keeps on being active by receiving new traffic. 
+    # TLDR; results can contain flows with a date outside of the specified time window.
+    #
     # Check if we want to limit the results to a time window
     if($PSCmdlet.ParameterSetName -eq "TIMELIMIT") {
       if($using_params -gt 0) {
