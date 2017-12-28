@@ -1016,6 +1016,12 @@ function Get-vRNIFlow
   Get all flows that occurred in the last 10 minutes and ignore all flows
   that are not TCP based.
 
+  .EXAMPLE
+
+  PS C:\> Get-vRNIFlow -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()) | Where {$_.traffic_type -eq "INTERNET_TRAFFIC"}
+
+  Get only internet-based (in or out) flows that occurred in the last 10 minutes.
+
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -1205,7 +1211,7 @@ function Get-vRNIVM
     foreach($vm in $vm_list.results)
     {
       # Retrieve application details and store them
-      $vm_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/vms/$($vm.entity_id)"
+      $vm_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/vms/$($vm.entity_id)?time=$($vm.time)"
       $vms.Add($vm_info) | Out-Null
       # Don't overload the API, pause a bit
       Start-Sleep -m 100
@@ -1308,7 +1314,7 @@ function Get-vRNIvCenter
     foreach($vcenter in $vcenter_list.results)
     {
       # Retrieve application details and store them
-      $vcenter_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/vcenter-managers/$($vcenter.entity_id)"
+      $vcenter_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/vcenter-managers/$($vcenter.entity_id)?time=$($vcenter.time)"
       $vcenters.Add($vcenter_info) | Out-Null
 
       if($Name -eq $vcenter_info.name) {
