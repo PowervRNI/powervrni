@@ -882,10 +882,13 @@ function Get-vRNIApplicationTier
   Show the tiers for the application container called "My3TierApp"
   #>
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true)]
       # Application object, gotten from Get-vRNIApplication
       [ValidateNotNullOrEmpty()]
       [PSObject]$Application,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned to a specific name
+      [string]$Name = "",
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
       [ValidateNotNullOrEmpty()]
@@ -904,9 +907,56 @@ function Get-vRNIApplicationTier
     # Retrieve application details and store them
     $tier_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($Application.entity_id)/tiers/$($tier.entity_id)"
     $tiers.Add($tier_info) | Out-Null
+
+    # Don't go on if we've already found the one the user wants specifically
+    if($Name -eq $tier_info.name) {
+      break
+    }
   }
 
-  $tiers
+  # Filter out other application tiers if the user wants one specifically
+  if ($Name) {
+    $tiers | Where-Object { $_.name -eq $Name }
+  } 
+  else {
+    $tiers
+  }
+}
+
+
+function Remove-vRNIApplicationTier
+{
+  <#
+  .SYNOPSIS
+  Remove a tier from an application container from vRealize Network Insight.
+
+  .DESCRIPTION
+  Within vRNI there are applications, which can be viewed as groups of VMs.
+  These groups can be used to group the VMs of a certain application together,
+  and filter on searches within vRNI. For instance, you can generate recommended
+  firewall rules based on an application group.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIApplication My3TierApp | Get-vRNIApplicationTier web-tier | Remove-vRNIApplicationTier
+
+  Remove the tier 'web-tier' from the application container called "My3TierApp"
+  #>
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Application Tier object, gotten from Get-vRNIApplicationTier
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$ApplicationTier,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Send the DELETE request and show the result
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -URI "/api/ni/groups/applications/$($ApplicationTier.application.entity_id)/tiers/$($ApplicationTier.entity_id)"
+
+  $result
 }
 
 function New-vRNIApplication
