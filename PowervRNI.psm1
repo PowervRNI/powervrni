@@ -826,6 +826,9 @@ function Get-vRNIApplication
   Get only the application details of the application named "3 Tier App"
   #>
   param (
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned to a specific name
+      [string]$Name = "",
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
       [ValidateNotNullOrEmpty()]
@@ -844,9 +847,143 @@ function Get-vRNIApplication
     # Retrieve application details and store them
     $app_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($app.entity_id)"
     $applications.Add($app_info) | Out-Null
+
+    # Don't go on if we've already found the one the user wants specifically
+    if($Name -eq $app_info.name) {
+      break
+    }
   }
 
-  $applications
+  # Filter out other applications if the user wants one specifically
+  if ($Name) {
+    $applications | Where-Object { $_.name -eq $Name }
+  } 
+  else {
+    $applications
+  }
+}
+
+function Get-vRNIApplicationTier
+{
+  <#
+  .SYNOPSIS
+  Get Application Tier information from vRealize Network Insight.
+
+  .DESCRIPTION
+  Within vRNI there are applications, which can be viewed as groups of VMs.
+  These groups can be used to group the VMs of a certain application together,
+  and filter on searches within vRNI. For instance, you can generate recommended
+  firewall rules based on an application group.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIApplication My3TierApp | Get-vRNIApplicationTier
+
+  Show the tiers for the application container called "My3TierApp"
+  #>
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Application object, gotten from Get-vRNIApplication
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$Application,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # First, get a list of all tier. This returns a list with application IDs which we can use
+  # to retrieve the details of the applications
+  $tier_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($Application.entity_id)/tiers"
+
+  # Use this as a results container
+  $tiers = [System.Collections.ArrayList]@()
+
+  foreach($tier in $tier_list.results)
+  {
+    # Retrieve application details and store them
+    $tier_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($Application.entity_id)/tiers/$($tier.entity_id)"
+    $tiers.Add($tier_info) | Out-Null
+  }
+
+  $tiers
+}
+
+function New-vRNIApplication
+{
+  <#
+  .SYNOPSIS
+  Create a new Application container inside vRealize Network Insight.
+
+  .DESCRIPTION
+  Within vRNI there are applications, which can be viewed as groups of VMs.
+  These groups can be used to group the VMs of a certain application together,
+  and filter on searches within vRNI. For instance, you can generate recommended
+  firewall rules based on an application group.
+
+  .EXAMPLE
+
+  PS C:\> New-vRNIApplication -Name My3TierApp
+
+  Create a new application container with the name My3TierApp.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false, Position=1)]
+      # Give the application a name
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = @{
+    "name" = $Name
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/groups/applications" -Body $requestBody
+
+  $response
+}
+
+
+function Remove-vRNIApplication
+{
+  <#
+  .SYNOPSIS
+  Remove an Application container from vRealize Network Insight.
+
+  .DESCRIPTION
+  Within vRNI there are applications, which can be viewed as groups of VMs.
+  These groups can be used to group the VMs of a certain application together,
+  and filter on searches within vRNI. For instance, you can generate recommended
+  firewall rules based on an application group.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIApplication My3TierApp | Remove-vRNIApplication
+
+  Remove the application container called "My3TierApp"
+  #>
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Application object, gotten from Get-vRNIApplication
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$Application,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Send the DELETE request and show the result
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -URI "/api/ni/groups/applications/$($Application.entity_id)"
+
+  $result
 }
 
 #####################################################################################################################
@@ -1213,6 +1350,12 @@ function Get-vRNIVM
       # Retrieve application details and store them
       $vm_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/vms/$($vm.entity_id)?time=$($vm.time)"
       $vms.Add($vm_info) | Out-Null
+
+      if($Name -eq $vm_info.name) {
+        $finished = true
+        break
+      }
+      
       # Don't overload the API, pause a bit
       Start-Sleep -m 100
 
