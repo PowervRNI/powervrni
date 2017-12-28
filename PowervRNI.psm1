@@ -1346,3 +1346,123 @@ function Get-vRNIvCenter
     $vcenters
   }
 }
+
+function Get-vRNIHost
+{
+  <#
+  .SYNOPSIS
+  Get available hypervisor hosts from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all hosts in your environment
+  and this cmdlet will help you discover these hosts.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIHost
+
+  Get all hypervisor hosts in the vRNI environment.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIHost esxi01.lab
+
+  Retrieve the ESXi host object for the one called "esxi01.lab"
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIHost | Select name, service_tag
+
+  Get a list of all hosts with their hardware service tag.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIHost | Where {$_.nsx_manager -ne ""}  
+
+  Get all hosts that are managed by a NSX Manager.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Use this as a results container
+  $hosts = [System.Collections.ArrayList]@()
+
+  # vRNI uses a paging system with (by default) 10 items per page. These vars are to keep track of the pages and retrieve what's left
+  $size = 10
+  $total_count = 0
+  $current_count = 0
+  $cursor = ""
+  $finished = $false
+
+  while(!$finished)
+  {
+    # This is the base URI for the problems 
+    $URI = "/api/ni/entities/hosts"
+    if($size -gt 0 -And $cursor -ne "") {
+      $URI += "?size=$($size)&cursor=$($cursor)"
+    }
+
+    Write-Debug "Using URI: $($URI)"
+
+    # Get a list of all problems
+    $host_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
+
+    # If we're not finished, store information about the run for next use
+    if($finished -eq $false)
+    {
+      $total_count = $host_list.total_count
+      $cursor      = $host_list.cursor
+    }
+
+    # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
+    if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
+      $finished = $true
+    }
+  
+    # Go through the problems individually and store them in the results array
+    foreach($host in $host_list.results)
+    {
+      # Retrieve host details and store them
+      $host_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/hosts/$($host.entity_id)?time=$($host.time)"
+      $hosts.Add($host_info) | Out-Null
+
+      if($Name -eq $host_info.name) {
+        $finished = true
+        break
+      }
+      # Don't overload the API, pause a bit
+      Start-Sleep -m 100
+
+      $current_count++
+      
+      # If we are limiting the output, break from the loops and return results
+      if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
+        $finished = $true
+        break
+      }
+    }
+    # Check remaining items, if it's less than the default size, reduce the next page size
+    if($size -gt ($total_count - $current_count)) {
+      $size = ($total_count - $current_count)
+    }
+    
+  }
+
+  if ($Name) {
+    $hosts | Where-Object { $_.name -eq $Name }
+  } 
+  else {
+    $hosts
+  }
+}
