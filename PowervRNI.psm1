@@ -166,6 +166,7 @@ function Invoke-vRNIRestMethod
       throw $_.exception.tostring()
     }
   }
+
   catch {
     # Not a webexception (may be on PoSH core), log and throw the underlying ex string
     $ErrorString = "$($MyInvocation.MyCommand.Name) : Exception occured calling invoke-restmethod. $($_.exception.tostring())"
@@ -923,6 +924,89 @@ function Get-vRNIApplicationTier
   }
 }
 
+function New-vRNIApplicationTier
+{
+  <#
+  .SYNOPSIS
+  Create a Tier in an Application container in vRealize Network Insight.
+
+  .DESCRIPTION
+  Within vRNI there are applications, which can be viewed as groups of VMs.
+  These groups can be used to group the VMs of a certain application together,
+  and filter on searches within vRNI. For instance, you can generate recommended
+  firewall rules based on an application group.
+
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIApplication My3TierApp | New-vRNIApplicationTier -Name web-tier -Filters ("name = '3TA-Web01' or name = '3TA-Web02'")
+
+  Create a new tier in the application 'My3TierApp' called 'web-tier' and assign the
+  VMs named '3TA-Web01' and '3TA-Web02' to this tier.
+
+  .EXAMPLE
+
+  PS C:\> $security_group_id = (Get-vRNISecurityGroup SG-3Tier-App).entity_id
+  PS C:\> Get-vRNIApplication My3TierApp | New-vRNIApplicationTier -Name app-tier -Filters ("name = '3TA-App01'", "security_groups.entity_id = '$security_group_id'")
+
+  Create a new tier in the application 'My3TierApp' called 'web-tier' and assign the
+  VMs named '3TA-Web01' and '3TA-Web02' to this tier.
+
+  .PARAMETER Filters
+
+  The filters within an application tier determine what VMs will be placed in that
+  application. Currently, only these options are supported:
+
+  Single VM:                   "name = '3TA-App01'"
+  Multiple VMs:                "name = '3TA-App01' or name = '3TA-App02'"
+  VMs with a NSX Security Tag: "security_groups.entity_id = '18230:82:604573173'"
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true)]
+      # Application object, gotten from Get-vRNIApplication
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$Application,
+    [Parameter (Mandatory=$true)]
+      # The name of the new tier
+      [string]$Name,
+    [Parameter (Mandatory=$true)]
+      # The VM filters in the new tier
+      [string[]]$Filters,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = @{
+    "name" = $Name
+    "group_membership_criteria" = @()
+  }
+
+  # TODO: also allow custom searches based on entity_type VirtualMachine
+  foreach($filter in $Filters)
+  {
+    $criteria_record = @{}
+    $criteria_record.membership_type = "SearchMembershipCriteria"
+    $criteria_record.search_membership_criteria = @{
+      "entity_type" = "BaseVirtualMachine"
+      "filter" = $filter
+    }
+    $requestFormat.group_membership_criteria += $criteria_record
+  }
+
+  Write-Debug $requestFormat
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat -Depth 5
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method POST -URI "/api/ni/groups/applications/$($Application.entity_id)/tiers" -Body $requestBody
+
+  $result
+
+}
+
 
 function Remove-vRNIApplicationTier
 {
@@ -1657,5 +1741,115 @@ function Get-vRNIHost
   } 
   else {
     $hosts
+  }
+}
+
+
+
+function Get-vRNISecurityGroup
+{
+  <#
+  .SYNOPSIS
+  Get available security groups (SG) from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all SGs in your environment
+  and this cmdlet will help you discover these SGs.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNISecurityGroup
+
+  Get all security groups in the vRNI environment.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNISecurityGroup 3TA-Management-Access
+
+  Retrieve the security group object for the one called "3TA-Management-Access"
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Use this as a results container
+  $securitygroups = [System.Collections.ArrayList]@()
+
+  # vRNI uses a paging system with (by default) 10 items per page. These vars are to keep track of the pages and retrieve what's left
+  $size = 10
+  $total_count = 0
+  $current_count = 0
+  $cursor = ""
+  $finished = $false
+
+  while(!$finished)
+  {
+    # This is the base URI for the problems 
+    $URI = "/api/ni/entities/security-groups"
+    if($size -gt 0 -And $cursor -ne "") {
+      $URI += "?size=$($size)&cursor=$($cursor)"
+    }
+
+    Write-Debug "Using URI: $($URI)"
+
+    # Get a list of all security groups
+    $sg_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
+
+    # If we're not finished, store information about the run for next use
+    if($finished -eq $false)
+    {
+      $total_count = $sg_list.total_count
+      $cursor      = $sg_list.cursor
+    }
+
+    # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
+    if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
+      $finished = $true
+    }
+  
+    # Go through the security groups individually and store them in the results array
+    foreach($sg in $sg_list.results)
+    {
+      # Retrieve security group details and store them
+      $sg_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/security-groups/$($sg.entity_id)?time=$($sg.time)"
+      $securitygroups.Add($sg_info) | Out-Null
+
+      if($Name -eq $sg_info.name) {
+        $finished = true
+        break
+      }
+      # Don't overload the API, pause a bit
+      Start-Sleep -m 100
+
+      $current_count++
+      
+      # If we are limiting the output, break from the loops and return results
+      if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
+        $finished = $true
+        break
+      }
+    }
+    # Check remaining items, if it's less than the default size, reduce the next page size
+    if($size -gt ($total_count - $current_count)) {
+      $size = ($total_count - $current_count)
+    }
+    
+  }
+
+  if ($Name) {
+    $securitygroups | Where-Object { $_.name -eq $Name }
+  } 
+  else {
+    $securitygroups
   }
 }
