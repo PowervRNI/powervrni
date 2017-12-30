@@ -2,9 +2,6 @@
 # Martijn Smit (@smitmartijn)
 # msmit@vmware.com
 # Version 0.1
-#
-# Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing the base
-# functions & principles on which this module is built on.
 
 
 # Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource
@@ -39,6 +36,8 @@ $Script:DatasourceInternalURLs.Add("CheckpointFirewallDataSource", "/data-source
 $Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panorama-firewalls")
 
 
+# Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing the base
+# functions & principles on which this module is built on.
 function Invoke-vRNIRestMethod
 {
   <#
@@ -242,24 +241,57 @@ function Connect-vRNIServer
       # vRNI Platform hostname or IP address
       [ValidateNotNullOrEmpty()]
       [string]$Server,
-    [Parameter (Mandatory=$true)]
+    [Parameter (Mandatory=$false)]
       # Username to use to login to vRNI
       [ValidateNotNullOrEmpty()]
       [string]$Username,
-    [Parameter (Mandatory=$true)]
+    [Parameter (Mandatory=$false)]
       # Password to use to login to vRNI
       [ValidateNotNullOrEmpty()]
       [string]$Password,
+    [Parameter (Mandatory=$false)]
+      #PSCredential object containing NSX API authentication credentials
+      [PSCredential]$Credential,
     [Parameter (Mandatory=$false)]
       # Domain to use to login to vRNI (if it's not given, use LOCAL)
       [ValidateNotNullOrEmpty()]
       [string]$Domain = "LOCAL"
   )
+  
+  # Make sure either -Credential is set, or both -Username and -Password
+  if(($PsBoundParameters.ContainsKey("Credential")  -And $PsBoundParameters.ContainsKey("Username")) -Or
+     ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Password"))) 
+  {
+    throw "Specify either -Credential or -Username to authenticate (if using -Username and omitting -Password, a prompt will be given)"
+  }
+
+  # Build cred object for default auth if user specified username/pass
+  $connection_credentials = ""
+  if($PsBoundParameters.ContainsKey("Username")) 
+  {
+    # Is the -Password omitted? Prompt securely
+    if(!$PsBoundParameters.ContainsKey("Password")) {
+      $connection_credentials = Get-Credential -UserName $Username -Message "vRealize Network Insight Platform Authentication"
+    }
+    # If the password has been given in cleartext, 
+    else {
+      $connection_credentials = New-Object System.Management.Automation.PSCredential($Username, $(ConvertTo-SecureString $Password -AsPlainText -Force))
+    }
+  }
+  # If a credential object was given as a parameter, use that
+  elseif($PSBoundParameters.ContainsKey("Credential")) 
+  {
+    $connection_credentials = $Credential
+  }
+  # If no -Username or -Credential was given, prompt for credentials
+  elseif(!$PSBoundParameters.ContainsKey("Credential")) {
+    $connection_credentials = Get-Credential -Message "vRealize Network Insight Platform Authentication"
+  }
 
   # Start building the hash table containing the login call we need to do
   $requestFormat = @{
-    "username" = $Username
-    "password" = $Password
+    "username" = $connection_credentials.Username
+    "password" = $connection_credentials.GetNetworkCredential().Password
   }
 
   # If no domain param is given, use the default LOCAL domain and populate the "domain" field
