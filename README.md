@@ -40,6 +40,7 @@ After logging in and starting a session, you can start doing information calls t
 
 ```
 PS C:\> Get-Command -Module PowervRNI                                                                                                                                                        ```
+```
 
 You'll see that there are a bunch of cmdlets you can use. To give you an example of what kind of output PowervRNI produces, here's an example from my lab:
 
@@ -92,4 +93,4 @@ If not, see https://www.gnu.org/licenses/gpl-2.0.html.
 
 The full text of the General Public License 2.0 is provided in the COPYING file.
 Some files may be comprised of various open source software components, each of which
-has its own license that is located in the source code of the respective component.‚Äù
+has its own license that is located in the source code of the respective component.î
