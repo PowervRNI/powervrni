@@ -35,8 +35,12 @@ $Script:DatasourceInternalURLs.Add("HPVCManagerDataSource", "/data-sources/hpvc-
 $Script:DatasourceInternalURLs.Add("CheckpointFirewallDataSource", "/data-sources/checkpoint-firewalls")
 $Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panorama-firewalls")
 
+# Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing some of the base functions &
+# principles on which this module is built on.
+
 # Run at module load time to determine a few things about the platform this module is running on.
-function _init 
+# TODO: use a psd1 to mask this function to the outside world
+function _PvRNI_init 
 {
   # $PSVersionTable.PSEdition property does not exist pre v5.  We need to do a few things in
   # exported functions to workaround some limitations of core edition, so we export
@@ -72,8 +76,6 @@ function _init
 }
 
 
-# Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing the base
-# functions & principles on which this module is built on.
 function Invoke-vRNIRestMethod
 {
   <#
@@ -2247,4 +2249,4 @@ function Get-vRNIDatastore
 }
 
 # Call Init function
-_init
+_PvRNI_init
