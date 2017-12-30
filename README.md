@@ -72,7 +72,7 @@ More examples and usage documentation to come.
 Currently, [@smitmartijn](https://twitter.com/smitmartijn) started this project and will keep maintaining it. Reach out to me via twitter or the [Issues Page](https://github.com/powervrni/powervrni/issues) here on GitHub. If you want to contribute, also get in touch with me.
 
 
-## Is PowervRNI supported?
+## Is PowervRNI supported by VMware?
 
 No. This is an opensource project started by [@smitmartijn](https://twitter.com/smitmartijn) and not supported by VMware. Please test and validate its functionality before using in a production environment.
 
