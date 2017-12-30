@@ -1126,319 +1126,6 @@ function Remove-vRNIApplication
 #####################################################################################################################
 #####################################################################################################################
 
-
-function Get-vRNIProblem
-{
-  <#
-  .SYNOPSIS
-  Get open problems from vRealize Network Insight.
-
-  .DESCRIPTION
-  vRNI checks for problems in your environment and displays or alerts you
-  about these problems. These problems can have multiple causes; for example
-  latency issues with NSX Controllers, a configuration issue on the VDS, etc.
-  In the end you're supposed to solve these problems and have no open ones.
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIProblem
-
-  Get a list of all open problems
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIProblem | Where {$_.severity -eq "CRITICAL"}
-
-  Get a list of all open problems which have the CRITICAL severity (and are
-  probably important to solve quickly)
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIProblem -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds())
-
-  Get all problems that have been open in the last 10 minutes. 
-
-  #>
-  param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to start looking up records
-      [int]$StartTime = 0,
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to stop looking up records
-      [int]$EndTime = 0,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
-  )
-
-  # Call Get-vRNIEntity with the proper URI to get the entity results
-  $results = Get-vRNIEntity -Entity_URI "problems" -Limit $Limit -StartTime $StartTime -EndTime $EndTime
-  $results
-}
-
-
-function Get-vRNIFlow
-{
-  <#
-  .SYNOPSIS
-  Get network flows from vRealize Network Insight.
-
-  .DESCRIPTION
-  vRNI can consume NetFlow and IPFIX data from the vSphere Distributed 
-  Switch and physical switches which support NetFlow v5, v7, v9 or IPFIX.
-  This cmdlet will let you export these flows 
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIFlow
-
-  Get the last 100 flows (100 = default)
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIFlow -Limit 10
-
-  Get the last 10 flows
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIFlow -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds())
-
-  Get all flows that occurred in the last 10 minutes. 
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIFlow -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()) | Where {$_.protocol -eq "TCP"}
-
-  Get all flows that occurred in the last 10 minutes and ignore all flows
-  that are not TCP based.
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIFlow -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()) | Where {$_.traffic_type -eq "INTERNET_TRAFFIC"}
-
-  Get only internet-based (in or out) flows that occurred in the last 10 minutes.
-
-  #>
-  param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 100,
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to start looking up records
-      [int]$StartTime = 0,
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to stop looking up records
-      [int]$EndTime = 0,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
-  )
-
-  # If we want to select flows in a time slot, make sure the end time is later then the start time
-  if($PSCmdlet.ParameterSetName -eq "TIMELIMIT") {
-    if($StartTime -gt $EndTime) {
-      throw "Param StartTime cannot be greater than EndTime"
-    }
-  }
-
-  # Call Get-vRNIEntity with the proper URI to get the entity results
-  $results = Get-vRNIEntity -Entity_URI "flows" -Limit $Limit -StartTime $StartTime -EndTime $EndTime
-  $results
-}
-
-
-function Get-vRNIVM
-{
-  <#
-  .SYNOPSIS
-  Get virtual machines from vRealize Network Insight.
-
-  .DESCRIPTION
-  vRealize Network Insight has a database of all VMs in your environment
-  and this cmdlet will help you discover these VMs.
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIVM
-
-  List all VMs in your vRNI environment (note: this may take a while if you 
-  have a lot of VMs)
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIVM -Name my-vm-name
-
-  Retrieve only the VM object called "my-vm-name"
-
-  .EXAMPLE
-
-  PS C:\> $vcenter_entity_id = (Get-vRNIvCenter | Where {$_.name -eq "vcenter.lab"}).entity_id                                                                                   
-  PS C:\> Get-vRNIVM | Where {$_.vcenter_manager.entity_id -eq $vcenter_entity_id}    
-
-  Get all VMs that are attached to the vCenter named "vcenter.lab"
-
-  #>
-  param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
-  )
-
-  # Call Get-vRNIEntity with the proper URI to get the entity results
-  $results = Get-vRNIEntity -Entity_URI "vms" -Name $Name -Limit $Limit
-  $results
-}
-
-function Get-vRNIvCenter
-{
-  <#
-  .SYNOPSIS
-  Get configured vCenter instances from vRealize Network Insight.
-
-  .DESCRIPTION
-  vRealize Network Insight has a database of all vCenters in your environment
-  and this cmdlet will help you discover these vCenters.
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIvCenter
-
-  Get all vCenters in the vRNI environment.
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIvCenter vcenter.lab
-
-  Retrieve the vCenter object for the one called "vcenter.lab"
-
-  #>
-  param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
-  )
-
-  # Call Get-vRNIEntity with the proper URI to get the entity results
-  $results = Get-vRNIEntity -Entity_URI "vcenter-managers" -Name $Name -Limit $Limit
-  $results
-}
-
-function Get-vRNIHost
-{
-  <#
-  .SYNOPSIS
-  Get available hypervisor hosts from vRealize Network Insight.
-
-  .DESCRIPTION
-  vRealize Network Insight has a database of all hosts in your environment
-  and this cmdlet will help you discover these hosts.
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIHost
-
-  Get all hypervisor hosts in the vRNI environment.
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIHost esxi01.lab
-
-  Retrieve the ESXi host object for the one called "esxi01.lab"
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIHost | Select name, service_tag
-
-  Get a list of all hosts with their hardware service tag.
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNIHost | Where {$_.nsx_manager -ne ""}  
-
-  Get all hosts that are managed by a NSX Manager.
-
-  #>
-  param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
-  )
-
-  # Call Get-vRNIEntity with the proper URI to get the entity results
-  $results = Get-vRNIEntity -Entity_URI "hosts" -Name $Name -Limit $Limit
-  $results
-}
-
-function Get-vRNISecurityGroup
-{
-  <#
-  .SYNOPSIS
-  Get available security groups (SG) from vRealize Network Insight.
-
-  .DESCRIPTION
-  vRealize Network Insight has a database of all SGs in your environment
-  and this cmdlet will help you discover these SGs.
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNISecurityGroup
-
-  Get all security groups in the vRNI environment.
-
-  .EXAMPLE
-
-  PS C:\> Get-vRNISecurityGroup 3TA-Management-Access
-
-  Retrieve the security group object for the one called "3TA-Management-Access"
-
-  #>
-  param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
-  )
-
-  # Call Get-vRNIEntity with the proper URI to get the entity results
-  $results = Get-vRNIEntity -Entity_URI "security-groups" -Name $Name -Limit $Limit
-  $results
-}
-
-
-
 function Get-vRNIEntity
 {
   <#
@@ -1575,4 +1262,898 @@ function Get-vRNIEntity
   else {
     $entities
   }
+}
+
+function Get-vRNIProblem
+{
+  <#
+  .SYNOPSIS
+  Get open problems from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRNI checks for problems in your environment and displays or alerts you
+  about these problems. These problems can have multiple causes; for example
+  latency issues with NSX Controllers, a configuration issue on the VDS, etc.
+  In the end you're supposed to solve these problems and have no open ones.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIProblem
+
+  Get a list of all open problems
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIProblem | Where {$_.severity -eq "CRITICAL"}
+
+  Get a list of all open problems which have the CRITICAL severity (and are
+  probably important to solve quickly)
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIProblem -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds())
+
+  Get all problems that have been open in the last 10 minutes. 
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to start looking up records
+      [int]$StartTime = 0,
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to stop looking up records
+      [int]$EndTime = 0,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "problems" -Limit $Limit -StartTime $StartTime -EndTime $EndTime
+  $results
+}
+
+
+function Get-vRNIFlow
+{
+  <#
+  .SYNOPSIS
+  Get network flows from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRNI can consume NetFlow and IPFIX data from the vSphere Distributed 
+  Switch and physical switches which support NetFlow v5, v7, v9 or IPFIX.
+  This cmdlet will let you export these flows 
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIFlow
+
+  Get the last 100 flows (100 = default)
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIFlow -Limit 10
+
+  Get the last 10 flows
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIFlow -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds())
+
+  Get all flows that occurred in the last 10 minutes. 
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIFlow -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()) | Where {$_.protocol -eq "TCP"}
+
+  Get all flows that occurred in the last 10 minutes and ignore all flows
+  that are not TCP based.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIFlow -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()) | Where {$_.traffic_type -eq "INTERNET_TRAFFIC"}
+
+  Get only internet-based (in or out) flows that occurred in the last 10 minutes.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 100,
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to start looking up records
+      [int]$StartTime = 0,
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to stop looking up records
+      [int]$EndTime = 0,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # If we want to select flows in a time slot, make sure the end time is later then the start time
+  if($PSCmdlet.ParameterSetName -eq "TIMELIMIT") {
+    if($StartTime -gt $EndTime) {
+      throw "Param StartTime cannot be greater than EndTime"
+    }
+  }
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "flows" -Limit $Limit -StartTime $StartTime -EndTime $EndTime
+  $results
+}
+
+#----------------------------------------------------------------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+#-----------------------------------------  VM Entities ---------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+
+function Get-vRNIVM
+{
+  <#
+  .SYNOPSIS
+  Get virtual machines from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all VMs in your environment
+  and this cmdlet will help you discover these VMs.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIVM
+
+  List all VMs in your vRNI environment (note: this may take a while if you 
+  have a lot of VMs)
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIVM -Name my-vm-name
+
+  Retrieve only the VM object called "my-vm-name"
+
+  .EXAMPLE
+
+  PS C:\> $vcenter_entity_id = (Get-vRNIvCenter | Where {$_.name -eq "vcenter.lab"}).entity_id                                                                                   
+  PS C:\> Get-vRNIVM | Where {$_.vcenter_manager.entity_id -eq $vcenter_entity_id}    
+
+  Get all VMs that are attached to the vCenter named "vcenter.lab"
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "vms" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNIVMvNIC
+{
+  <#
+  .SYNOPSIS
+  Get virtual machine vnics from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all VM vNICs in your environment
+  and this cmdlet will help you discover these VM vNICs.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIVMvNIC
+
+  List all VM vNICs in your vRNI environment (note: this may take a while if you 
+  have a lot of VMs)
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "vnics" -Name $Name -Limit $Limit
+  $results
+}
+
+#----------------------------------------------------------------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+#--------------------------------------- vCenter Entities -------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+
+function Get-vRNIvCenter
+{
+  <#
+  .SYNOPSIS
+  Get configured vCenter instances from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all vCenters in your environment
+  and this cmdlet will help you discover these vCenters.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIvCenter
+
+  Get all vCenters in the vRNI environment.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIvCenter vcenter.lab
+
+  Retrieve the vCenter object for the one called "vcenter.lab"
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "vcenter-managers" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNIvCenterFolder
+{
+  <#
+  .SYNOPSIS
+  Get available vCenter folders from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all vCenter folders in your environment
+  and this cmdlet will help you discover these folders.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIvCenterFolder
+
+  Get all vCenter folders in the vRNI environment.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "folders" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNIvCenterDatacenter
+{
+  <#
+  .SYNOPSIS
+  Get available vCenter Datacenters from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all vCenter Datacenters in your 
+  environment and this cmdlet will help you discover these Datacenters.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIvCenterDatacenter
+
+  Get all vCenter Datacenters in the vRNI environment.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "vc-datacenters" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNIvCenterCluster
+{
+  <#
+  .SYNOPSIS
+  Get available vCenter Clusters from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all vCenter Clusters in your 
+  environment and this cmdlet will help you discover these Clusters.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIvCenterCluster
+
+  Get all vCenter Clusters in the vRNI environment.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "clusters" -Name $Name -Limit $Limit
+  $results
+}
+
+#----------------------------------------------------------------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+#-------------------------------------- ESXi host Entities ------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+function Get-vRNIHost
+{
+  <#
+  .SYNOPSIS
+  Get available hypervisor hosts from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all hosts in your environment
+  and this cmdlet will help you discover these hosts.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIHost
+
+  Get all hypervisor hosts in the vRNI environment.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIHost esxi01.lab
+
+  Retrieve the ESXi host object for the one called "esxi01.lab"
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIHost | Select name, service_tag
+
+  Get a list of all hosts with their hardware service tag.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIHost | Where {$_.nsx_manager -ne ""}  
+
+  Get all hosts that are managed by a NSX Manager.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "hosts" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNIHostVMKNic
+{
+  <#
+  .SYNOPSIS
+  Get available host vmknics from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all host vmknics in your 
+  environment and this cmdlet will help you discover these vmknids.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIHostVMKNic
+
+  Get all host vmknics in the vRNI environment.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "vmknics" -Name $Name -Limit $Limit
+  $results
+}
+
+#----------------------------------------------------------------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+#------------------------------------------- NSX Entities -------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+
+function Get-vRNISecurityGroup
+{
+  <#
+  .SYNOPSIS
+  Get available security groups (SG) from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all SGs in your environment
+  and this cmdlet will help you discover these SGs.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNISecurityGroup
+
+  Get all security groups in the vRNI environment.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNISecurityGroup 3TA-Management-Access
+
+  Retrieve the security group object for the one called "3TA-Management-Access"
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "security-groups" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNISecurityTag
+{
+  <#
+  .SYNOPSIS
+  Get available security tags (ST) from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all STs in your environment
+  and this cmdlet will help you discover these STs.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNISecurityTag
+
+  Get all security tags in the vRNI environment.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNISecurityTag ST-3TA-Management
+
+  Retrieve the security tag object for the one called "ST-3TA-Management"
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "security-tags" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNIIPSet
+{
+  <#
+  .SYNOPSIS
+  Get available NSX IP Sets from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all NSX IP Sets in your environment
+  and this cmdlet will help you discover these IP sets.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIIPSet
+
+  Get all IP Sets in the vRNI environment.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "ip-sets" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNIService
+{
+  <#
+  .SYNOPSIS
+  Get available NSX Services from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all NSX Services in your environment
+  and this cmdlet will help you discover these Services.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIService
+
+  Get all NSX Services in the vRNI environment.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "services" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNIServiceGroup
+{
+  <#
+  .SYNOPSIS
+  Get available NSX Service Groups from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all NSX Service Groups in your environment
+  and this cmdlet will help you discover these groups.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIServiceGroup
+
+  Get all NSX Service Groups in the vRNI environment.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "service-groups" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNINSXManager
+{
+  <#
+  .SYNOPSIS
+  Get available NSX Managers from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all NSX Managers in your environment
+  and this cmdlet will help you discover these NSX Managers.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNINSXManager
+
+  Get all NSX Managers in the vRNI environment.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "nsx-managers" -Name $Name -Limit $Limit
+  $results
+}
+
+#----------------------------------------------------------------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+#---------------------------------------- Networking Entities ---------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+
+function Get-vRNIFirewallRule
+{
+  <#
+  .SYNOPSIS
+  Get available firewall rules from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all firewall rules in your environment
+  and this cmdlet will help you discover these rules.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIFirewallRule
+
+  Get all firewall rules in the vRNI environment.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "firewall-rules" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNIL2Network
+{
+  <#
+  .SYNOPSIS
+  Get available layer 2 networks from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all networks in your environment
+  and this cmdlet will help you discover these layer 2 networks.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIL2Network
+
+  Get all layer 2 networks in the vRNI environment.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIL2Network | Where {$_.entity_type -eq "VxlanLayer2Network"} 
+
+  Only show all VXLAN layer 2 networks.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "layer2-networks" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNIDistributedSwitch
+{
+  <#
+  .SYNOPSIS
+  Get available vSphere Distributed Switches from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all VDSes in your environment
+  and this cmdlet will help you discover these VDSes.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIDistributedSwitch
+
+  Get all vSphere Distributed Switches in the vRNI environment.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIDistributedSwitch LabSwitch
+
+  Get only the VDS called 'LabSwitch'
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "distributed-virtual-switches" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNIDistributedSwitchPortGroup
+{
+  <#
+  .SYNOPSIS
+  Get available VDS Portgroups from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all VDS Portgroups in your environment
+  and this cmdlet will help you discover these portgroups.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIDistributedSwitchPortGroup
+
+  Get all VDS Portgroups in the vRNI environment.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIDistributedSwitchPortGroup Web-Tier
+
+  Get only the portgroup called 'Web-Tier'
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "distributed-virtual-portgroups" -Name $Name -Limit $Limit
+  $results
+}
+
+#----------------------------------------------------------------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+#----------------------------------------- Storage Entities -----------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+#----------------------------------------------------------------------------------------------------------------#
+
+function Get-vRNIDatastore
+{
+  <#
+  .SYNOPSIS
+  Get available datastores from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all datastores in your environment
+  and this cmdlet will help you discover these datastores.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIDatastore
+
+  Get all datastores in the vRNI environment.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "datastores" -Name $Name -Limit $Limit
+  $results
 }
