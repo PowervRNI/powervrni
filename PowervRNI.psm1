@@ -1175,79 +1175,9 @@ function Get-vRNIProblem
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  # Use this as a results container
-  $problems = [System.Collections.ArrayList]@()
-
-  # vRNI uses a paging system with (by default) 10 items per page. These vars are to keep track of the pages and retrieve what's left
-  $size = 10
-  $total_count = 0
-  $current_count = 0
-  $cursor = ""
-  $finished = $false
-
-  while(!$finished)
-  {
-    $using_params = 0
-    # This is the base URI for the problems 
-    $URI = "/api/ni/entities/problems"
-    if($size -gt 0 -And $cursor -ne "") {
-      $URI += "?size=$($size)&cursor=$($cursor)"
-      $using_params++
-    }
-
-    # Check if we want to limit the results to a time window
-    if($PSCmdlet.ParameterSetName -eq "TIMELIMIT") 
-    {
-      if($using_params -gt 0) {
-        $URI += "&start_time=$($StartTime)&end_time=$($EndTime)"
-        $using_params++
-      }
-      else {
-        $URI += "?start_time=$($StartTime)&end_time=$($EndTime)"
-        $using_params++
-      }
-    }
-
-    Write-Debug "Using URI: $($URI)"
-
-    # Get a list of all problems
-    $problem_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
-
-    # If we're not finished, store information about the run for next use
-    if($finished -eq $false)
-    {
-      $total_count = $problem_list.total_count
-      $cursor      = $problem_list.cursor
-    }
-    # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
-    if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
-      $finished = $true
-    }
-  
-    # Go through the problems individually and store them in the results array
-    foreach($problem in $problem_list.results)
-    {
-      # Retrieve application details and store them
-      $problem_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/problems/$($problem.entity_id)?time=$($problem.time)"
-      $problems.Add($problem_info) | Out-Null
-      # Don't overload the API, pause a bit
-      Start-Sleep -m 100
-
-      $current_count++
-      
-      # If we are limiting the output, break from the loops and return results
-      if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
-        $finished = $true
-        break
-      }
-    }
-    # Check remaining items, if it's less than the default size, reduce the next page size
-    if($size -gt ($total_count - $current_count)) {
-      $size = ($total_count - $current_count)
-    }
-  }
-
-  $problems
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "problems" -Limit $Limit -StartTime $StartTime -EndTime $EndTime
+  $results
 }
 
 
@@ -1317,86 +1247,9 @@ function Get-vRNIFlow
     }
   }
 
-  # Use this as a results container
-  $flows = [System.Collections.ArrayList]@()
-
-  # vRNI uses a paging system with (by default) 10 items per page. These vars are to keep track of the pages and retrieve what's left
-  $size = 10
-  $total_count = 0
-  $current_count = 0
-  $cursor = ""
-  $finished = $false
-
-  while(!$finished)
-  {
-    $using_params = 0
-    # This is the base URI for the problems 
-    $URI = "/api/ni/entities/flows"
-    if($size -gt 0 -And $cursor -ne "") {
-      $URI += "?size=$($size)&cursor=$($cursor)"
-      $using_params++
-    }
-
-    # NOTE: The time window returns flows that have been active in that specific time window. It might be the case that
-    # the flow itself was created earlier then given time window and keeps on being active by receiving new traffic. 
-    # TLDR; results can contain flows with a date outside of the specified time window.
-    #
-    # Check if we want to limit the results to a time window
-    if($PSCmdlet.ParameterSetName -eq "TIMELIMIT") {
-      if($using_params -gt 0) {
-        $URI += "&start_time=$($StartTime)&end_time=$($EndTime)"
-        $using_params++
-      }
-      else {
-        $URI += "?start_time=$($StartTime)&end_time=$($EndTime)"
-        $using_params++
-      }
-    }
-
-    Write-Debug "Using URI: $($URI)"
-
-    # Get a list of all problems
-    $flow_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
-
-    # If we're not finished, store information about the run for next use
-    if($finished -eq $false)
-    {
-      $total_count = $flow_list.total_count
-      $cursor      = $flow_list.cursor
-    }
-
-    # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
-    if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
-      $finished = $true
-    }
-  
-    # Go through the problems individually and store them in the results array
-    foreach($flow in $flow_list.results)
-    {
-      # Retrieve application details and store them
-      $flow_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/flows/$($flow.entity_id)"
-      #$flow_info.time = $flow.time
-      $flow_info | Add-Member -Name "time" -value $flow.time -MemberType NoteProperty
-      $flows.Add($flow_info) | Out-Null
-      # Don't overload the API, pause a bit
-      Start-Sleep -m 100
-
-      $current_count++
-
-      # If we are limiting the output, break from the loops and return results
-      if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
-        $finished = $true
-        break
-      }
-    }
-
-    # Check remaining items, if it's less than the default size, reduce the next page size
-    if($size -gt ($total_count - $current_count)) {
-      $size = ($total_count - $current_count)
-    }
-  }
-
-  $flows
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "flows" -Limit $Limit -StartTime $StartTime -EndTime $EndTime
+  $results
 }
 
 
@@ -1444,76 +1297,9 @@ function Get-vRNIVM
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  # Use this as a results container
-  $vms = [System.Collections.ArrayList]@()
-
-  # vRNI uses a paging system with (by default) 10 items per page. These vars are to keep track of the pages and retrieve what's left
-  $size = 10
-  $total_count = 0
-  $current_count = 0
-  $cursor = ""
-  $finished = $false
-
-  while(!$finished)
-  {
-    # This is the base URI for the problems 
-    $URI = "/api/ni/entities/vms"
-    if($size -gt 0 -And $cursor -ne "") {
-      $URI += "?size=$($size)&cursor=$($cursor)"
-    }
-
-    Write-Debug "Using URI: $($URI)"
-
-    # Get a list of all problems
-    $vm_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
-
-    # If we're not finished, store information about the run for next use
-    if($finished -eq $false)
-    {
-      $total_count = $vm_list.total_count
-      $cursor      = $vm_list.cursor
-    }
-    # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
-    if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
-      $finished = $true
-    }
-  
-    # Go through the problems individually and store them in the results array
-    foreach($vm in $vm_list.results)
-    {
-      # Retrieve application details and store them
-      $vm_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/vms/$($vm.entity_id)?time=$($vm.time)"
-      $vms.Add($vm_info) | Out-Null
-
-      if($Name -eq $vm_info.name) {
-        $finished = true
-        break
-      }
-      
-      # Don't overload the API, pause a bit
-      Start-Sleep -m 100
-
-      $current_count++
-      
-      # If we are limiting the output, break from the loops and return results
-      if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
-        $finished = $true
-        break
-      }
-    }
-    # Check remaining items, if it's less than the default size, reduce the next page size
-    if($size -gt ($total_count - $current_count)) {
-      $size = ($total_count - $current_count)
-    }
-    
-  }
-
-  if ($Name) {
-    $vms | Where-Object { $_.name -eq $Name }
-  } 
-  else {
-    $vms
-  }
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "vms" -Name $Name -Limit $Limit
+  $results
 }
 
 function Get-vRNIvCenter
@@ -1552,76 +1338,9 @@ function Get-vRNIvCenter
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  # Use this as a results container
-  $vcenters = [System.Collections.ArrayList]@()
-
-  # vRNI uses a paging system with (by default) 10 items per page. These vars are to keep track of the pages and retrieve what's left
-  $size = 10
-  $total_count = 0
-  $current_count = 0
-  $cursor = ""
-  $finished = $false
-
-  while(!$finished)
-  {
-    # This is the base URI for the problems 
-    $URI = "/api/ni/entities/vcenter-managers"
-    if($size -gt 0 -And $cursor -ne "") {
-      $URI += "?size=$($size)&cursor=$($cursor)"
-    }
-
-    Write-Debug "Using URI: $($URI)"
-
-    # Get a list of all problems
-    $vcenter_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
-
-    # If we're not finished, store information about the run for next use
-    if($finished -eq $false)
-    {
-      $total_count = $vcenter_list.total_count
-      $cursor      = $vcenter_list.cursor
-    }
-
-    # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
-    if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
-      $finished = $true
-    }
-  
-    # Go through the problems individually and store them in the results array
-    foreach($vcenter in $vcenter_list.results)
-    {
-      # Retrieve application details and store them
-      $vcenter_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/vcenter-managers/$($vcenter.entity_id)?time=$($vcenter.time)"
-      $vcenters.Add($vcenter_info) | Out-Null
-
-      if($Name -eq $vcenter_info.name) {
-        $finished = true
-        break
-      }
-      # Don't overload the API, pause a bit
-      Start-Sleep -m 100
-
-      $current_count++
-      
-      # If we are limiting the output, break from the loops and return results
-      if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
-        $finished = $true
-        break
-      }
-    }
-    # Check remaining items, if it's less than the default size, reduce the next page size
-    if($size -gt ($total_count - $current_count)) {
-      $size = ($total_count - $current_count)
-    }
-    
-  }
-
-  if ($Name) {
-    $vcenters | Where-Object { $_.name -eq $Name }
-  } 
-  else {
-    $vcenters
-  }
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "vcenter-managers" -Name $Name -Limit $Limit
+  $results
 }
 
 function Get-vRNIHost
@@ -1672,79 +1391,10 @@ function Get-vRNIHost
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  # Use this as a results container
-  $hosts = [System.Collections.ArrayList]@()
-
-  # vRNI uses a paging system with (by default) 10 items per page. These vars are to keep track of the pages and retrieve what's left
-  $size = 10
-  $total_count = 0
-  $current_count = 0
-  $cursor = ""
-  $finished = $false
-
-  while(!$finished)
-  {
-    # This is the base URI for the problems 
-    $URI = "/api/ni/entities/hosts"
-    if($size -gt 0 -And $cursor -ne "") {
-      $URI += "?size=$($size)&cursor=$($cursor)"
-    }
-
-    Write-Debug "Using URI: $($URI)"
-
-    # Get a list of all problems
-    $host_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
-
-    # If we're not finished, store information about the run for next use
-    if($finished -eq $false)
-    {
-      $total_count = $host_list.total_count
-      $cursor      = $host_list.cursor
-    }
-
-    # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
-    if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
-      $finished = $true
-    }
-  
-    # Go through the problems individually and store them in the results array
-    foreach($host in $host_list.results)
-    {
-      # Retrieve host details and store them
-      $host_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/hosts/$($host.entity_id)?time=$($host.time)"
-      $hosts.Add($host_info) | Out-Null
-
-      if($Name -eq $host_info.name) {
-        $finished = true
-        break
-      }
-      # Don't overload the API, pause a bit
-      Start-Sleep -m 100
-
-      $current_count++
-      
-      # If we are limiting the output, break from the loops and return results
-      if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
-        $finished = $true
-        break
-      }
-    }
-    # Check remaining items, if it's less than the default size, reduce the next page size
-    if($size -gt ($total_count - $current_count)) {
-      $size = ($total_count - $current_count)
-    }
-    
-  }
-
-  if ($Name) {
-    $hosts | Where-Object { $_.name -eq $Name }
-  } 
-  else {
-    $hosts
-  }
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "hosts" -Name $Name -Limit $Limit
+  $results
 }
-
-
 
 function Get-vRNISecurityGroup
 {
@@ -1782,8 +1432,61 @@ function Get-vRNISecurityGroup
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "security-groups" -Name $Name -Limit $Limit
+  $results
+}
+
+
+
+function Get-vRNIEntity
+{
+  <#
+  .SYNOPSIS
+  Get available entities from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all kinds of entities inside
+  the monitored infrastructure. This is a catch-all function to retrieve
+  any entity and the objects related to that entity.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIEntity -Entity_URI "security-groups"
+
+  Get all security groups in the vRNI environment.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIEntity -Entity_URI "hosts" -Name "esxi01.lab"
+
+  Get the entity object for the hypervisor host called "esxi01.lab"
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      # Limit the amount of records returned
+      [string]$Entity_URI,
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to start looking up records
+      [int]$StartTime = 0,
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to stop looking up records
+      [int]$EndTime = 0,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
   # Use this as a results container
-  $securitygroups = [System.Collections.ArrayList]@()
+  $entities = [System.Collections.ArrayList]@()
 
   # vRNI uses a paging system with (by default) 10 items per page. These vars are to keep track of the pages and retrieve what's left
   $size = 10
@@ -1794,22 +1497,36 @@ function Get-vRNISecurityGroup
 
   while(!$finished)
   {
+    $using_params = 0
     # This is the base URI for the problems 
-    $URI = "/api/ni/entities/security-groups"
+    $URI = "/api/ni/entities/$($Entity_URI)"
     if($size -gt 0 -And $cursor -ne "") {
       $URI += "?size=$($size)&cursor=$($cursor)"
+      $using_params++
+    }
+
+    # Check if we want to limit the results to a time window
+    if($PSCmdlet.ParameterSetName -eq "TIMELIMIT" -And ($StartTime -gt 0 -And $EndTime -gt 0)) {
+      if($using_params -gt 0) {
+        $URI += "&start_time=$($StartTime)&end_time=$($EndTime)"
+        $using_params++
+      }
+      else {
+        $URI += "?start_time=$($StartTime)&end_time=$($EndTime)"
+        $using_params++
+      }
     }
 
     Write-Debug "Using URI: $($URI)"
 
-    # Get a list of all security groups
-    $sg_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
+    # Get a list of all entities
+    $entity_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
 
     # If we're not finished, store information about the run for next use
     if($finished -eq $false)
     {
-      $total_count = $sg_list.total_count
-      $cursor      = $sg_list.cursor
+      $total_count = $entity_list.total_count
+      $cursor      = $entity_list.cursor
     }
 
     # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
@@ -1817,14 +1534,20 @@ function Get-vRNISecurityGroup
       $finished = $true
     }
   
-    # Go through the security groups individually and store them in the results array
-    foreach($sg in $sg_list.results)
+    # Go through the entities individually and store them in the results array
+    foreach($sg in $entity_list.results)
     {
-      # Retrieve security group details and store them
-      $sg_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/security-groups/$($sg.entity_id)?time=$($sg.time)"
-      $securitygroups.Add($sg_info) | Out-Null
+      # Retrieve entity details and store them
+      $entity_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/$($Entity_URI)/$($sg.entity_id)?time=$($sg.time)"
 
-      if($Name -eq $sg_info.name) {
+      # If we're retrieving flows, add the time of the main flow to this specific flow record
+      if($Entity_URI -eq "flows") {
+        $entity_info | Add-Member -Name "time" -value $entity_info.time -MemberType NoteProperty
+      }
+
+      $entities.Add($entity_info) | Out-Null
+
+      if($Name -eq $entity_info.name) {
         $finished = true
         break
       }
@@ -1847,9 +1570,9 @@ function Get-vRNISecurityGroup
   }
 
   if ($Name) {
-    $securitygroups | Where-Object { $_.name -eq $Name }
+    $entities | Where-Object { $_.name -eq $Name }
   } 
   else {
-    $securitygroups
+    $entities
   }
 }
