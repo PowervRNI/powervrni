@@ -35,6 +35,42 @@ $Script:DatasourceInternalURLs.Add("HPVCManagerDataSource", "/data-sources/hpvc-
 $Script:DatasourceInternalURLs.Add("CheckpointFirewallDataSource", "/data-sources/checkpoint-firewalls")
 $Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panorama-firewalls")
 
+# Run at module load time to determine a few things about the platform this module is running on.
+function _init 
+{
+  # $PSVersionTable.PSEdition property does not exist pre v5.  We need to do a few things in
+  # exported functions to workaround some limitations of core edition, so we export
+  # the global PNSXPSTarget var to reference if required.
+  if(($PSVersionTable.PSVersion.Major -ge 6) -or (($PSVersionTable.PSVersion.Major -eq 5) -And ($PSVersionTable.PSVersion.Minor -ge 1))) {
+    $script:PvRNI_PlatformType = $PSVersionTable.PSEdition
+  }
+  else {
+    $script:PvRNI_PlatformType = "Desktop"
+  }
+
+  # Define class required for certificate validation override.  Version dependant.
+  # For whatever reason, this does not work when contained within a function?
+  $TrustAllCertsPolicy = @"
+    using System.Net;
+    using System.Security.Cryptography.X509Certificates;
+    public class TrustAllCertsPolicy : ICertificatePolicy {
+      public bool CheckValidationResult(
+        ServicePoint srvPoint, X509Certificate certificate,
+        WebRequest request, int certificateProblem) 
+      {
+        return true;
+      }
+    }
+"@
+
+  if($script:PvRNI_PlatformType -eq "Desktop") {
+    if (-not ("TrustAllCertsPolicy" -as [type])) {
+      Add-Type $TrustAllCertsPolicy
+      Write-Host "TrustAllCertsPolicy"
+    }
+  }
+}
+
 
 # Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing the base
 # functions & principles on which this module is built on.
@@ -133,15 +169,35 @@ function Invoke-vRNIRestMethod
   $URL = "https://$($Server)$($URI)"
   Write-Debug "$(Get-Date -format s)  REST Call via Invoke-RestMethod: $Method $URL - with body: $Body"
 
+  # Build up Invoke-RestMethod parameters, can differ per platform
+  $invokeRestMethodParams = @{
+    "Method" = $Method;
+    "Headers" = $headerDict;
+    "ContentType" = "application/json";
+    "Uri" = $URL;
+  }
+
+  if($Body -ne "") {
+    $invokeRestMethodParams.Add("Body", $body)
+  }
+
+  # On PowerShell Desktop, add a trigger to ignore SSL certificate checks
+  if(($script:PvRNI_PlatformType -eq "Desktop")) 
+  {
+    # Allow untrusted certificate presented by the remote system to be accepted
+    if([System.Net.ServicePointManager]::CertificatePolicy.tostring() -ne 'TrustAllCertsPolicy') {
+      [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+    }
+  }
+  # Core (for now) uses a different mechanism to manipulating [System.Net.ServicePointManager]::CertificatePolicy
+  if(($script:PvRNI_PlatformType -eq "Core")) {
+    $invokeRestMethodParams.Add("SkipCertificateCheck", $true)
+  }
+
   # Energize!
   try
   {
-    if ($Body -ne "") {
-      $response = Invoke-RestMethod -SkipCertificateCheck -Method $Method -Headers $headerDict -ContentType "application/json" -Uri $URL -Body $Body
-    }
-    else {
-      $response = Invoke-RestMethod -SkipCertificateCheck -Method $Method -Headers $headerDict -ContentType "application/json" -Uri $URL
-    }
+    $response = Invoke-RestMethod @invokeRestMethodParams
   }
 
   # If its a webexception, we may have got a response from the server with more information...
@@ -2189,3 +2245,6 @@ function Get-vRNIDatastore
   $results = Get-vRNIEntity -Entity_URI "datastores" -Name $Name -Limit $Limit
   $results
 }
+
+# Call Init function
+_init
