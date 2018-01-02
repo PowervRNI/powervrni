@@ -9,11 +9,12 @@ This module is _not supported_ by VMware, and comes with no warranties express o
 
 ## Installing PowervRNI
 
-Right now, PowervRNI is a simple one-file module. To install it, download it to a PowerShell enabled machine and load it. PowervRNI is supported for PowerShell Desktop & Core, so Windows, MacOS and Linux. Here is an example on how to load it:
+Right now, PowervRNI is a simple two-file module. To install it, download it to a PowerShell enabled machine and load it. PowervRNI is supported for PowerShell Desktop & Core, so Windows, MacOS and Linux. Here is an example on how to load it:
 
 ```
-PS C:\> Invoke-WebRequest -Uri "https://raw.githubusercontent.com/powervrni/powervrni/master/PowervRNI.ps1" -OutFile "PowervRNI.psm1" 
-PS C:\> Import-Module .\PowervRNI.psm1
+PS C:\> Invoke-WebRequest -Uri "https://raw.githubusercontent.com/powervrni/powervrni/master/PowervRNI.psm1" -OutFile "PowervRNI.psm1" 
+PS C:\> Invoke-WebRequest -Uri "https://raw.githubusercontent.com/powervrni/powervrni/master/PowervRNI.psd1" -OutFile "PowervRNI.psd1" 
+PS C:\> Import-Module .\PowervRNI.psd1
 ```
 
 ## Usage
