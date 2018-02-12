@@ -1,0 +1,7 @@
+Application;Tier;Security Group;VM Names
+App01;Web;;App01-VM1-Web,App01-VM2-Web
+App01;App;SG-3Tier-App;App01-VM*-App
+App01;DB;SG-App01-DB;
+App02;NoTier;SG-App02;
+App03;Web;;App03-Web*
+App03;DB;;App03-DB*
