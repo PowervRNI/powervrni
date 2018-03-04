@@ -9,6 +9,20 @@ This module is _not supported_ by VMware, and comes with no warranties express o
 
 ## Installing PowervRNI
 
+
+There are 2 ways of installing PowervRNI. An easy one through PowerShell Gallery where everything is taken care of for you, or a slightly harder one where you download the module and load it up manually.
+
+### PowerShell Gallery
+
+```
+PS C:\> Install-Module PowervRNI
+PS C:\> Import-Module PowervRNI
+```
+
+That's it, you're off the the races.
+
+### Manual Download
+
 Right now, PowervRNI is a simple two-file module. To install it, download it to a PowerShell enabled machine and load it. PowervRNI is supported for PowerShell Desktop & Core, so Windows, MacOS and Linux. Here is an example on how to load it:
 
 ```
