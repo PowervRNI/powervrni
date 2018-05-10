@@ -1408,6 +1408,39 @@ function Get-vRNIEntity
   }
 }
 
+function Get-vRNIEntityName
+{
+  <#
+  .SYNOPSIS
+  Translate an entity id to a name in vRealize Network Insight.
+
+  .DESCRIPTION
+  The internal database of vRealize Network Insight uses entity IDs
+  to keep track of entities. This function translates an ID to an 
+  actual useable name.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIEntityName -EntityID 14307:562:1274720802
+
+  Get the name of the entity with ID 14307:562:1274720802
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, Position=1)]
+      # The entity ID to resolve to a name
+      [string]$EntityID,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Invoke-vRNIRestMethod with the proper URI to get the entity results
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/names/$($EntityID)"
+  $result
+}
+
 function Get-vRNIProblem
 {
   <#
