@@ -1029,7 +1029,7 @@ function New-vRNIApplicationTier
 
   .EXAMPLE
 
-  PS C:\> Get-vRNIApplication My3TierApp | New-vRNIApplicationTier -Name web-tier -Filters ("name = '3TA-Web01' or name = '3TA-Web02'")
+  PS C:\> Get-vRNIApplication My3TierApp | New-vRNIApplicationTier -Name web-tier -VMFilters ("name = '3TA-Web01' or name = '3TA-Web02'")
 
   Create a new tier in the application 'My3TierApp' called 'web-tier' and assign the
   VMs named '3TA-Web01' and '3TA-Web02' to this tier.
@@ -1037,10 +1037,26 @@ function New-vRNIApplicationTier
   .EXAMPLE
 
   PS C:\> $security_group_id = (Get-vRNISecurityGroup SG-3Tier-App).entity_id
-  PS C:\> Get-vRNIApplication My3TierApp | New-vRNIApplicationTier -Name app-tier -Filters ("name = '3TA-App01'", "security_groups.entity_id = '$security_group_id'")
+  PS C:\> Get-vRNIApplication My3TierApp | New-vRNIApplicationTier -Name app-tier -VMFilters ("name = '3TA-App01'", "security_groups.entity_id = '$security_group_id'")
 
   Create a new tier in the application 'My3TierApp' called 'web-tier' and assign the
   VMs named '3TA-Web01' and '3TA-Web02' to this tier.
+
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIApplication IP-Network | New-vRNIApplicationTier -Name IP-Set-1 -IPFilters ("100.194.0.0/24", "192.168.1.1", "192.168.10.0/27")
+
+  This retrieves the existing application called 'IP-Network' and creates a new tier
+  inside it called 'IP-Set-1' with a /24 subnet, a single host and a /27 subnet.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIApplication IP-Network | New-vRNIApplicationTier -Name IP-Host-2 -IPFilters ("172.16.0.10")
+
+  This retrieves the existing application called 'IP-Network' and creates a new tier
+  inside it called 'IP-Host-2' with a single host on the IP 172.16.0.10.
+
 
   .PARAMETER Filters
 
@@ -1052,6 +1068,10 @@ function New-vRNIApplicationTier
   VMs with a NSX Security Tag: "security_groups.entity_id = '18230:82:604573173'"
 
   #>
+
+  # To keep backwards compatibility with 1.0
+  [CmdletBinding(DefaultParameterSetName="VMFilter")]
+
   param (
     [Parameter (Mandatory=$true, ValueFromPipeline=$true)]
       # Application object, gotten from Get-vRNIApplication
@@ -1060,14 +1080,24 @@ function New-vRNIApplicationTier
     [Parameter (Mandatory=$true)]
       # The name of the new tier
       [string]$Name,
-    [Parameter (Mandatory=$true)]
+    [Parameter (Mandatory=$false, ParameterSetName="VMFilter")]
       # The VM filters in the new tier
       [string[]]$Filters,
+    [Parameter (Mandatory=$false, ParameterSetName="MultipleFilters")]
+      # The VM filters in the new tier
+      [string[]]$VMFilters,
+    [Parameter (Mandatory=$false, ParameterSetName="IPFilters")]
+      # The IP set filters in the new tier
+      [string[]]$IPFilters,
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
       [ValidateNotNullOrEmpty()]
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
+
+  if(!$Filters -And !$VMFilters -And !$IPFilters) {
+    throw "Please provide at least one filter."
+  }
 
   # Format request with all given data
   $requestFormat = @{
@@ -1075,15 +1105,39 @@ function New-vRNIApplicationTier
     "group_membership_criteria" = @()
   }
 
-  # TODO: also allow custom searches based on entity_type VirtualMachine
-  foreach($filter in $Filters)
+  # Backwards compatibility with 1.0 - if the old -Filters are given, transfer it to $VMFilters
+  if ($pscmdlet.ParameterSetName -eq "VMFilter") {
+    $VMFilters = $Filters
+  }
+
+  # If supplied, go through the VM filters and build the call
+  if($VMFilters)
+  {
+    foreach($filter in $VMFilters)
+    {
+      $criteria_record = @{}
+      $criteria_record.membership_type = "SearchMembershipCriteria"
+      $criteria_record.search_membership_criteria = @{
+        "entity_type" = "BaseVirtualMachine"
+        "filter" = $filter
+      }
+      $requestFormat.group_membership_criteria += $criteria_record
+    }
+  }
+
+  # If supplied, go through the IP filters and build the call
+  if($IPFilters)
   {
     $criteria_record = @{}
-    $criteria_record.membership_type = "SearchMembershipCriteria"
-    $criteria_record.search_membership_criteria = @{
-      "entity_type" = "BaseVirtualMachine"
-      "filter" = $filter
+    $criteria_record.membership_type = "IPAddressMembershipCriteria"
+    $criteria_record.ip_address_membership_criteria = @{}
+    $criteria_record.ip_address_membership_criteria.ip_addresses = @()
+
+    foreach($ipset in $IPFilters)
+    {
+      $criteria_record.ip_address_membership_criteria.ip_addresses += $ipset
     }
+
     $requestFormat.group_membership_criteria += $criteria_record
   }
 
