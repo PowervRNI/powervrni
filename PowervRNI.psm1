@@ -2335,5 +2335,99 @@ function Get-vRNIDatastore
   $results
 }
 
+#####################################################################################################################
+#####################################################################################################################
+#####################################  Recommended Firewall Rules  ##################################################
+#####################################################################################################################
+#####################################################################################################################
+
+function Get-vRNIRecommendedRules
+{
+  <#
+  .SYNOPSIS
+  Retrieve the recommended firewall rules of a specific application.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  required firewall rules to implement micro-segmentation. This means
+  you have a starting point when it comes to micro-segmentation and
+  implementing the needed firewall rules. This function retrieves the
+  recommended firewall rules for an application.
+
+  Per default this function uses a 14 day analysis period.
+
+  .EXAMPLE
+
+  PS C:\> Get-vRNIRecommendedRules -ApplicationID (Get-vRNIApplication vRNI).entity_id
+
+  This will return the recommended firewall rules for the application
+  called 'vRNI'
+
+  .EXAMPLE
+
+  PS C:\> $sevenDaysAgo = (Get-Date).AddDays(-7)
+  PS C:\> $start = [int][double]::Parse((Get-Date -Date $sevenDaysAgo -UFormat %s))
+  PS C:\> $end = [int][double]::Parse((Get-Date -UFormat %s))
+  PS C:\> Get-vRNIRecommendedRules -ApplicationID (Get-vRNIApplication vRNI).entity_id -StartTime $start -EndTime $end
+
+  This will return the recommended firewall rules for the application
+  called 'vRNI' from analysis on the last 7 days.
+
+  #>
+  param (
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to start looking up records
+      [int]$StartTime = 0,
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to stop looking up records
+      [int]$EndTime = 0,
+    [Parameter (Mandatory=$false)]
+      # The application entity ID for which to retrieve the recommended rules
+      [string]$ApplicationID = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  if($PSCmdlet.ParameterSetName -eq "TIMELIMIT" -And ($StartTime -gt 0 -And $EndTime -gt 0))
+  {
+    if($StartTime -gt $EndTime) {
+      throw "StartTime cannot be greated than EndTime"
+    }
+  }
+  else
+  {
+    # Use a timeframe of 14 days by default
+    $twoWeeksAgo = (Get-Date).AddDays(-14)
+    $StartTime = [int][double]::Parse((Get-Date -Date $twoWeeksAgo -UFormat %s))
+    $EndTime = [int][double]::Parse((Get-Date -UFormat %s))
+  }
+
+  # TODO: also allow lookups between 2 application tiers
+
+  # Format request with all given data
+  $requestFormat = @{
+    "group_1" = @{
+      "entity" = @{
+        "entity_type" = "Application"
+        "entity_id" = $ApplicationID
+      }
+    }
+    "time_range" = @{
+      "start_time" = $StartTime
+      "end_time" = $EndTime
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/micro-seg/recommended-rules" -Body $requestBody
+
+  $response.results
+}
+
+
+
 # Call Init function
 _PvRNI_init
