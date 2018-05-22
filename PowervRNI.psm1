@@ -8,6 +8,7 @@
 $Script:DatasourceURLs = @{}
 $Script:DatasourceURLs.Add("vcenter", @("/data-sources/vcenters"))
 $Script:DatasourceURLs.Add("nsxv", @("/data-sources/nsxv-managers"))
+$Script:DatasourceURLs.Add("nsxt", @("/data-sources/nsxt-managers"))
 $Script:DatasourceURLs.Add("ciscoswitch", @("/data-sources/cisco-switches"))
 $Script:DatasourceURLs.Add("aristaswitch", @("/data-sources/arista-switches"))
 $Script:DatasourceURLs.Add("dellswitch", @("/data-sources/dell-switches"))
@@ -24,6 +25,7 @@ $Script:DatasourceURLs.Add("all", @("/data-sources/vcenters", "/data-sources/nsx
 $Script:DatasourceInternalURLs = @{}
 $Script:DatasourceInternalURLs.Add("VCenterDataSource", "/data-sources/vcenters")
 $Script:DatasourceInternalURLs.Add("NSXVManagerDataSource", "/data-sources/nsxv-managers")
+$Script:DatasourceInternalURLs.Add("NSXTManagerDataSource", "/data-sources/nsxt-managers")
 $Script:DatasourceInternalURLs.Add("CiscoSwitchDataSource", "/data-sources/cisco-switches")
 $Script:DatasourceInternalURLs.Add("AristaSwitchDataSource", "/data-sources/arista-switches")
 $Script:DatasourceInternalURLs.Add("DellSwitchDataSource", "/data-sources/dell-switches")
@@ -544,7 +546,7 @@ function Get-vRNIDataSource
   param (
     [Parameter (Mandatory=$false)]
       # Which datasource type to get - TODO: make this a dynamic param to get the values from $Script:data
-      [ValidateSet ("vcenter", "nsxv", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall", "all")]
+      [ValidateSet ("vcenter", "nsxv", "nsxt", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall", "all")]
       [string]$DataSourceType="all",
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
@@ -620,7 +622,7 @@ function New-vRNIDataSource
   param (
     [Parameter (Mandatory=$true)]
       # Which datasource type to create - TODO: make this a dynamic param to get the values from $Script:data
-      [ValidateSet ("vcenter", "nsxv", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall")]
+      [ValidateSet ("vcenter", "nsxv", "nsxt", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall")]
       [string]$DataSourceType,
     [Parameter (Mandatory=$true)]
       # Username to use to login to the datasource
