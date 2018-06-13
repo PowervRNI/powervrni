@@ -77,7 +77,6 @@ function _PvRNI_init
   }
 }
 
-
 function Invoke-vRNIRestMethod
 {
   <#
@@ -197,6 +196,9 @@ function Invoke-vRNIRestMethod
   if(($script:PvRNI_PlatformType -eq "Core")) {
     $invokeRestMethodParams.Add("SkipCertificateCheck", $true)
   }
+
+  # Only use TLS as SSL connection to vRNI 
+  [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
 
   # Energize!
   try
@@ -369,9 +371,14 @@ function Connect-vRNIServer
     }
   }
 
+  # Only use TLS as SSL connection to vRNI 
+  [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
+
   # Convert the hash to JSON and send the request to vRNI
   $requestBody = ConvertTo-Json $requestFormat
+  Write-Debug "Request: $($requestBody)"
   $response = Invoke-vRNIRestMethod -Server $Server -Method POST -URI "/api/ni/auth/token" -Body $requestBody
+  Write-Debug "Response: $($response)"
 
   if($response)
   {
