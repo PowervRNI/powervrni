@@ -1373,7 +1373,6 @@ function Get-vRNIEntity
         entity_type = 'VirtualMachine'
         filter = "Name = '$Name'"
       } | ConvertTo-Json
-      $listParams['Body'] = $listParams['Body'].Replace('\u0027', "'")
       $listParams['Method'] = 'POST'
     }
 
