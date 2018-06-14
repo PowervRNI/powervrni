@@ -913,6 +913,12 @@ function Get-vRNIApplication
   and filter on searches within vRNI. For instance, you can generate recommended
   firewall rules based on an application group.
 
+  .PARAMETER Name
+  Limit the amount of records returned to a specific name
+
+  .PARAMETER Connection
+  vRNI Connection object
+
   .EXAMPLE
 
   PS C:\> Get-vRNIApplication
@@ -921,47 +927,52 @@ function Get-vRNIApplication
 
   .EXAMPLE
 
-  PS C:\> Get-vRNIApplication | Where {$_.name -eq "3 Tier App"}
+  PS C:\> Get-vRNIApplication -Name '3 Tier App'
 
   Get only the application details of the application named "3 Tier App"
   #>
   param (
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned to a specific name
-    [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-    # vRNI Connection object
+    [Parameter(Mandatory=$false, Position=1)]
+    [string] $Name,
+
+    [Parameter(Mandatory=$false)]
     [ValidateNotNullOrEmpty()]
-    [PSCustomObject]$Connection=$defaultvRNIConnection
+    [PSCustomObject] $Connection = $defaultvRNIConnection
   )
 
-  # First, get a list of all applications. This returns a list with application IDs which we can use
-  # to retrieve the details of the applications
-
-  # Use this as a results container
   $applications = [System.Collections.ArrayList]@()
+
+  $size = 50
+  $listParams = @{
+    Connection = $Connection
+    Method = 'GET'
+    Uri = "/api/ni/groups/applications?size=$size"
+  }
+
+  if ($Name) {
+    $listParams['Method'] = 'POST'
+    $listParams['Uri'] = '/api/ni/search'
+    $listParams['Body'] = @{
+      entity_type = 'Application'
+      filter = "Name = '$Name'"
+    } | ConvertTo-Json
+  }
 
   $hasMoreData = $true
   $counter = 0
-  $size = 50
-  $cursor = ''
   while ($hasMoreData) {
-    $uri = "/api/ni/groups/applications?size=$size&cursor=$cursor"
-    $application_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $uri
+    $applicationResponse = Invoke-vRNIRestMethod @listParams
 
-    Write-Verbose ("$($application_list.total_count) applications to process")
-    $cursor = $application_list.cursor
+    Write-Verbose ("$($applicationResponse.total_count) applications to process")
+    if ($applicationResponse.total_count -gt $size) {
+      $listParams['Uri'] += "&cursor=$($applicationResponse.cursor)"
+    }
 
-    foreach($app in $application_list.results)
+    foreach($app in $applicationResponse.results)
     {
       # Retrieve application details and store them
       $app_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($app.entity_id)"
       $applications.Add($app_info) | Out-Null
-
-      # Don't go on if we've already found the one the user wants specifically
-      if($Name -eq $app_info.name) {
-        break
-      }
 
       $counter++
 
@@ -969,7 +980,7 @@ function Get-vRNIApplication
       Start-Sleep -m 100
     }
 
-    $remaining = $application_list.total_count - $counter
+    $remaining = $applicationResponse.total_count - $counter
     if ($remaining -gt 0) {
       Write-Verbose "$remaining more applications to process"
       $hasMoreData = $true
@@ -979,13 +990,7 @@ function Get-vRNIApplication
     }
   }
 
-  # Filter out other applications if the user wants one specifically
-  if ($Name) {
-    $applications | Where-Object { $_.name -eq $Name }
-  }
-  else {
-    $applications
-  }
+  $applications
 }
 
 function Get-vRNIApplicationTier
