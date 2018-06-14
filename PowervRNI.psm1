@@ -937,20 +937,45 @@ function Get-vRNIApplication
 
   # First, get a list of all applications. This returns a list with application IDs which we can use
   # to retrieve the details of the applications
-  $application_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications"
 
   # Use this as a results container
   $applications = [System.Collections.ArrayList]@()
 
-  foreach($app in $application_list.results)
-  {
-    # Retrieve application details and store them
-    $app_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($app.entity_id)"
-    $applications.Add($app_info) | Out-Null
+  $hasMoreData = $true
+  $counter = 0
+  $size = 50
+  $cursor = ''
+  while ($hasMoreData) {
+    $uri = "/api/ni/groups/applications?size=$size&cursor=$cursor"
+    $application_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $uri
 
-    # Don't go on if we've already found the one the user wants specifically
-    if($Name -eq $app_info.name) {
-      break
+    Write-Verbose ("$($application_list.total_count) applications to process")
+    $cursor = $application_list.cursor
+
+    foreach($app in $application_list.results)
+    {
+      # Retrieve application details and store them
+      $app_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($app.entity_id)"
+      $applications.Add($app_info) | Out-Null
+
+      # Don't go on if we've already found the one the user wants specifically
+      if($Name -eq $app_info.name) {
+        break
+      }
+
+      $counter++
+
+      # Don't overload the API, pause a bit
+      Start-Sleep -m 100
+    }
+
+    $remaining = $application_list.total_count - $counter
+    if ($remaining -gt 0) {
+      Write-Verbose "$remaining more applications to process"
+      $hasMoreData = $true
+    }
+    else {
+      $hasMoreData = $false
     }
   }
 
