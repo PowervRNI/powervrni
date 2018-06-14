@@ -932,8 +932,11 @@ function Get-vRNIApplication
   Get only the application details of the application named "3 Tier App"
   #>
   param (
-    [Parameter(Mandatory=$false, Position=1)]
-    [string] $Name,
+    [Parameter(Mandatory=$false, Position=1, ParameterSetName = 'Filter')]
+    [string[]] $Name,
+
+    [Parameter(ParameterSetName = 'Filter')]
+    [string] $Creator,
 
     [Parameter(Mandatory=$false)]
     [ValidateNotNullOrEmpty()]
@@ -949,13 +952,34 @@ function Get-vRNIApplication
     Uri = "/api/ni/groups/applications?size=$size"
   }
 
-  if ($Name) {
+  if ($PSCmdlet.ParameterSetName -eq 'Filter') {
     $listParams['Method'] = 'POST'
     $listParams['Uri'] = '/api/ni/search'
-    $listParams['Body'] = @{
+
+    $body = @{
       entity_type = 'Application'
-      filter = "Name = '$Name'"
-    } | ConvertTo-Json
+    }
+
+    $filter = @()
+    if ($Name) {
+      if ($Name.Count -gt 1) {
+        $nameArray = @()
+        foreach ($nameItem in $Name) {
+          $nameArray += "'$nameItem'"
+        }
+        $nameSearchString = " in (" + ($nameArray -join ',') + ")"
+      }
+      else {
+        $nameSearchString = " = '$Name'"
+      }
+
+      $filter += "(Name $nameSearchString)"
+    }
+
+    $body['filter'] = $filter -join ' and '
+
+    $listParams['Body'] = $body | ConvertTo-Json
+    Write-Verbose ('Body: ' + $listParams['Body'])
   }
 
   $hasMoreData = $true
