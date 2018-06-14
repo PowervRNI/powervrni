@@ -928,11 +928,11 @@ function Get-vRNIApplication
   param (
     [Parameter (Mandatory=$false, Position=1)]
       # Limit the amount of records returned to a specific name
-      [string]$Name = "",
+    [string]$Name = "",
     [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
   # First, get a list of all applications. This returns a list with application IDs which we can use
