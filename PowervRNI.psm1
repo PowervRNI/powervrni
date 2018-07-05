@@ -1,6 +1,7 @@
 # vRealize Network Insight PowerShell module
 # Martijn Smit (@smitmartijn)
 # msmit@vmware.com
+# Version 1.0
 
 
 # Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource
@@ -153,7 +154,6 @@ function Invoke-vRNIRestMethod
     $server = $connection.Server
 
     # Check if the authentication token hasn't expired yet
-    # if([int][double]::Parse((Get-Date -UFormat %s)) -gt $authtoken_expiry) {
     if((Get-Date) -gt $connection.AuthTokenExpiry) {
       throw "The vRNI Authentication token has expired (expired at '$($connection.AuthTokenExpiry.DateTime)'). Please login again using Connect-vRNIServer."
     }
@@ -995,32 +995,32 @@ function Get-vRNIApplicationTier
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  # First, get a list of all tier. This returns a list with application IDs which we can use
-  # to retrieve the details of the applications
-  $tier_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($Application.entity_id)/tiers"
+  process {
+    ## do Foreach-Object, so as to enable user to pass multiple Application objects for value of -Application parameter
+    $Application | Foreach-Object {
+      $oThisApplication = $_
+      # First, get a list of all tier. This returns a list with application IDs which we can use
+      # to retrieve the details of the applications
+      $tier_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($oThisApplication.entity_id)/tiers"
 
-  # Use this as a results container
-  $tiers = [System.Collections.ArrayList]@()
+      # Use this as a results container
+      $tiers = [System.Collections.ArrayList]@()
 
-  foreach($tier in $tier_list.results)
-  {
-    # Retrieve application details and store them
-    $tier_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($Application.entity_id)/tiers/$($tier.entity_id)"
-    $tiers.Add($tier_info) | Out-Null
+      foreach($tier in $tier_list.results)
+      {
+        # Retrieve application details and store them
+        $tier_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($oThisApplication.entity_id)/tiers/$($tier.entity_id)"
+        $tiers.Add($tier_info) | Out-Null
 
-    # Don't go on if we've already found the one the user wants specifically
-    if($Name -eq $tier_info.name) {
-      break
-    }
-  }
+        # Don't go on if we've already found the one the user wants specifically
+        if($Name -eq $tier_info.name) {break}
+      }
 
-  # Filter out other application tiers if the user wants one specifically
-  if ($Name) {
-    $tiers | Where-Object { $_.name -eq $Name }
-  }
-  else {
-    $tiers
-  }
+      # Filter out other application tiers if the user wants one specifically
+      if ($Name) {$tiers | Where-Object { $_.name -eq $Name }}
+      else {$tiers}
+    } ## end Foreach-Object
+  } ## end process
 }
 
 function New-vRNIApplicationTier
