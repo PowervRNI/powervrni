@@ -42,7 +42,7 @@ $Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panor
 
 # Run at module load time to determine a few things about the platform this module is running on.
 # TODO: use a psd1 to mask this function to the outside world
-function _PvRNI_init 
+function _PvRNI_init
 {
   # $PSVersionTable.PSEdition property does not exist pre v5.  We need to do a few things in
   # exported functions to workaround some limitations of core edition, so we export
@@ -62,7 +62,7 @@ function _PvRNI_init
     public class TrustAllCertsPolicy : ICertificatePolicy {
       public bool CheckValidationResult(
         ServicePoint srvPoint, X509Certificate certificate,
-        WebRequest request, int certificateProblem) 
+        WebRequest request, int certificateProblem)
       {
         return true;
       }
@@ -151,12 +151,11 @@ function Invoke-vRNIRestMethod
     }
 
     $authtoken = $connection.AuthToken
-    $authtoken_expiry = $connection.AuthTokenExpiry
     $server = $connection.Server
 
     # Check if the authentication token hasn't expired yet
-    if([int][double]::Parse((Get-Date -UFormat %s)) -gt $authtoken_expiry) {
-      throw "The vRNI Authentication token has expired. Please login again using Connect-vRNIServer."
+    if((Get-Date) -gt $connection.AuthTokenExpiry) {
+      throw "The vRNI Authentication token has expired (expired at '$($connection.AuthTokenExpiry.DateTime)'). Please login again using Connect-vRNIServer."
     }
   }
 
@@ -185,7 +184,7 @@ function Invoke-vRNIRestMethod
   }
 
   # On PowerShell Desktop, add a trigger to ignore SSL certificate checks
-  if(($script:PvRNI_PlatformType -eq "Desktop")) 
+  if(($script:PvRNI_PlatformType -eq "Desktop"))
   {
     # Allow untrusted certificate presented by the remote system to be accepted
     if([System.Net.ServicePointManager]::CertificatePolicy.tostring() -ne 'TrustAllCertsPolicy') {
@@ -197,7 +196,7 @@ function Invoke-vRNIRestMethod
     $invokeRestMethodParams.Add("SkipCertificateCheck", $true)
   }
 
-  # Only use TLS as SSL connection to vRNI 
+  # Only use TLS as SSL connection to vRNI
   [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
 
   # Energize!
@@ -268,7 +267,7 @@ function Connect-vRNIServer
   use to perform authenticated REST API calls.
 
   The connection object contains the authentication token, the expiry
-  timestamp that the token expires and the vRNI server IP.
+  datetime that the token expires and the vRNI server address.
 
 
   .EXAMPLE
@@ -319,29 +318,29 @@ function Connect-vRNIServer
       [ValidateNotNullOrEmpty()]
       [string]$Domain = "LOCAL"
   )
-  
+
   # Make sure either -Credential is set, or both -Username and -Password
   if(($PsBoundParameters.ContainsKey("Credential")  -And $PsBoundParameters.ContainsKey("Username")) -Or
-     ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Password"))) 
+     ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Password")))
   {
     throw "Specify either -Credential or -Username to authenticate (if using -Username and omitting -Password, a prompt will be given)"
   }
 
   # Build cred object for default auth if user specified username/pass
   $connection_credentials = ""
-  if($PsBoundParameters.ContainsKey("Username")) 
+  if($PsBoundParameters.ContainsKey("Username"))
   {
     # Is the -Password omitted? Prompt securely
     if(!$PsBoundParameters.ContainsKey("Password")) {
       $connection_credentials = Get-Credential -UserName $Username -Message "vRealize Network Insight Platform Authentication"
     }
-    # If the password has been given in cleartext, 
+    # If the password has been given in cleartext,
     else {
       $connection_credentials = New-Object System.Management.Automation.PSCredential($Username, $(ConvertTo-SecureString $Password -AsPlainText -Force))
     }
   }
   # If a credential object was given as a parameter, use that
-  elseif($PSBoundParameters.ContainsKey("Credential")) 
+  elseif($PSBoundParameters.ContainsKey("Credential"))
   {
     $connection_credentials = $Credential
   }
@@ -371,7 +370,7 @@ function Connect-vRNIServer
     }
   }
 
-  # Only use TLS as SSL connection to vRNI 
+  # Only use TLS as SSL connection to vRNI
   [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
 
   # Convert the hash to JSON and send the request to vRNI
@@ -386,7 +385,8 @@ function Connect-vRNIServer
     $connection = [pscustomObject] @{
       "Server" = $Server
       "AuthToken" = $response.token
-      "AuthTokenExpiry" = $response.expiry
+      ## the expiration of the token; currently (vRNI API v1.0), tokens are valid for five (5) hours
+      "AuthTokenExpiry" = (Get-Date "01 Jan 1970").AddMilliseconds($response.expiry).ToLocalTime()
     }
 
     # Remember this as the default connection
@@ -607,10 +607,10 @@ function New-vRNIDataSource
   .EXAMPLE
 
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
-  PS C:\> New-vRNIDataSource -DataSourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password secret -CollectorVMId $collectorId -Nickname vc.nsx.local 
+  PS C:\> New-vRNIDataSource -DataSourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password secret -CollectorVMId $collectorId -Nickname vc.nsx.local
 
   First, get the node ID of the collector VM (assuming there's only one), then
-  add a vCenter located at vc.nsx.local to vRNI. 
+  add a vCenter located at vc.nsx.local to vRNI.
 
   .EXAMPLE
 
@@ -957,7 +957,7 @@ function Get-vRNIApplication
   # Filter out other applications if the user wants one specifically
   if ($Name) {
     $applications | Where-Object { $_.name -eq $Name }
-  } 
+  }
   else {
     $applications
   }
@@ -995,32 +995,32 @@ function Get-vRNIApplicationTier
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  # First, get a list of all tier. This returns a list with application IDs which we can use
-  # to retrieve the details of the applications
-  $tier_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($Application.entity_id)/tiers"
+  process {
+    ## do Foreach-Object, so as to enable user to pass multiple Application objects for value of -Application parameter
+    $Application | Foreach-Object {
+      $oThisApplication = $_
+      # First, get a list of all tier. This returns a list with application IDs which we can use
+      # to retrieve the details of the applications
+      $tier_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($oThisApplication.entity_id)/tiers"
 
-  # Use this as a results container
-  $tiers = [System.Collections.ArrayList]@()
+      # Use this as a results container
+      $tiers = [System.Collections.ArrayList]@()
 
-  foreach($tier in $tier_list.results)
-  {
-    # Retrieve application details and store them
-    $tier_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($Application.entity_id)/tiers/$($tier.entity_id)"
-    $tiers.Add($tier_info) | Out-Null
+      foreach($tier in $tier_list.results)
+      {
+        # Retrieve application details and store them
+        $tier_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($oThisApplication.entity_id)/tiers/$($tier.entity_id)"
+        $tiers.Add($tier_info) | Out-Null
 
-    # Don't go on if we've already found the one the user wants specifically
-    if($Name -eq $tier_info.name) {
-      break
-    }
-  }
+        # Don't go on if we've already found the one the user wants specifically
+        if($Name -eq $tier_info.name) {break}
+      }
 
-  # Filter out other application tiers if the user wants one specifically
-  if ($Name) {
-    $tiers | Where-Object { $_.name -eq $Name }
-  } 
-  else {
-    $tiers
-  }
+      # Filter out other application tiers if the user wants one specifically
+      if ($Name) {$tiers | Where-Object { $_.name -eq $Name }}
+      else {$tiers}
+    } ## end Foreach-Object
+  } ## end process
 }
 
 function New-vRNIApplicationTier
@@ -1338,7 +1338,7 @@ function Get-vRNIEntity
   while(!$finished)
   {
     $using_params = 0
-    # This is the base URI for the problems 
+    # This is the base URI for the problems
     $URI = "/api/ni/entities/$($Entity_URI)"
     if($size -gt 0 -And $cursor -ne "") {
       $URI += "?size=$($size)&cursor=$($cursor)"
@@ -1373,7 +1373,7 @@ function Get-vRNIEntity
     if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
       $finished = $true
     }
-  
+
     # Go through the entities individually and store them in the results array
     foreach($sg in $entity_list.results)
     {
@@ -1395,7 +1395,7 @@ function Get-vRNIEntity
       Start-Sleep -m 100
 
       $current_count++
-      
+
       # If we are limiting the output, break from the loops and return results
       if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
         $finished = $true
@@ -1406,12 +1406,12 @@ function Get-vRNIEntity
     if($size -gt ($total_count - $current_count)) {
       $size = ($total_count - $current_count)
     }
-    
+
   }
 
   if ($Name) {
     $entities | Where-Object { $_.name -eq $Name }
-  } 
+  }
   else {
     $entities
   }
@@ -1425,7 +1425,7 @@ function Get-vRNIEntityName
 
   .DESCRIPTION
   The internal database of vRealize Network Insight uses entity IDs
-  to keep track of entities. This function translates an ID to an 
+  to keep track of entities. This function translates an ID to an
   actual useable name.
 
   .EXAMPLE
@@ -1479,7 +1479,7 @@ function Get-vRNIProblem
 
   PS C:\> Get-vRNIProblem -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds())
 
-  Get all problems that have been open in the last 10 minutes. 
+  Get all problems that have been open in the last 10 minutes.
 
   #>
   param (
@@ -1511,9 +1511,9 @@ function Get-vRNIFlow
   Get network flows from vRealize Network Insight.
 
   .DESCRIPTION
-  vRNI can consume NetFlow and IPFIX data from the vSphere Distributed 
+  vRNI can consume NetFlow and IPFIX data from the vSphere Distributed
   Switch and physical switches which support NetFlow v5, v7, v9 or IPFIX.
-  This cmdlet will let you export these flows 
+  This cmdlet will let you export these flows
 
   .EXAMPLE
 
@@ -1531,7 +1531,7 @@ function Get-vRNIFlow
 
   PS C:\> Get-vRNIFlow -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds())
 
-  Get all flows that occurred in the last 10 minutes. 
+  Get all flows that occurred in the last 10 minutes.
 
   .EXAMPLE
 
@@ -1595,7 +1595,7 @@ function Get-vRNIVM
 
   PS C:\> Get-vRNIVM
 
-  List all VMs in your vRNI environment (note: this may take a while if you 
+  List all VMs in your vRNI environment (note: this may take a while if you
   have a lot of VMs)
 
   .EXAMPLE
@@ -1606,8 +1606,8 @@ function Get-vRNIVM
 
   .EXAMPLE
 
-  PS C:\> $vcenter_entity_id = (Get-vRNIvCenter | Where {$_.name -eq "vcenter.lab"}).entity_id                                                                                   
-  PS C:\> Get-vRNIVM | Where {$_.vcenter_manager.entity_id -eq $vcenter_entity_id}    
+  PS C:\> $vcenter_entity_id = (Get-vRNIvCenter | Where {$_.name -eq "vcenter.lab"}).entity_id
+  PS C:\> Get-vRNIVM | Where {$_.vcenter_manager.entity_id -eq $vcenter_entity_id}
 
   Get all VMs that are attached to the vCenter named "vcenter.lab"
 
@@ -1644,7 +1644,7 @@ function Get-vRNIVMvNIC
 
   PS C:\> Get-vRNIVMvNIC
 
-  List all VM vNICs in your vRNI environment (note: this may take a while if you 
+  List all VM vNICs in your vRNI environment (note: this may take a while if you
   have a lot of VMs)
 
   #>
@@ -1755,7 +1755,7 @@ function Get-vRNIvCenterDatacenter
   Get available vCenter Datacenters from vRealize Network Insight.
 
   .DESCRIPTION
-  vRealize Network Insight has a database of all vCenter Datacenters in your 
+  vRealize Network Insight has a database of all vCenter Datacenters in your
   environment and this cmdlet will help you discover these Datacenters.
 
   .EXAMPLE
@@ -1790,7 +1790,7 @@ function Get-vRNIvCenterCluster
   Get available vCenter Clusters from vRealize Network Insight.
 
   .DESCRIPTION
-  vRealize Network Insight has a database of all vCenter Clusters in your 
+  vRealize Network Insight has a database of all vCenter Clusters in your
   environment and this cmdlet will help you discover these Clusters.
 
   .EXAMPLE
@@ -1853,7 +1853,7 @@ function Get-vRNIHost
 
   .EXAMPLE
 
-  PS C:\> Get-vRNIHost | Where {$_.nsx_manager -ne ""}  
+  PS C:\> Get-vRNIHost | Where {$_.nsx_manager -ne ""}
 
   Get all hosts that are managed by a NSX Manager.
 
@@ -1883,7 +1883,7 @@ function Get-vRNIHostVMKNic
   Get available host vmknics from vRealize Network Insight.
 
   .DESCRIPTION
-  vRealize Network Insight has a database of all host vmknics in your 
+  vRealize Network Insight has a database of all host vmknics in your
   environment and this cmdlet will help you discover these vmknids.
 
   .EXAMPLE
@@ -2198,7 +2198,7 @@ function Get-vRNIL2Network
 
   .EXAMPLE
 
-  PS C:\> Get-vRNIL2Network | Where {$_.entity_type -eq "VxlanLayer2Network"} 
+  PS C:\> Get-vRNIL2Network | Where {$_.entity_type -eq "VxlanLayer2Network"}
 
   Only show all VXLAN layer 2 networks.
 
