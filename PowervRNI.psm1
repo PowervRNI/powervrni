@@ -214,23 +214,30 @@ function Invoke-vRNIRestMethod
       $responseStream = $response.GetResponseStream()
       $reader = New-Object system.io.streamreader($responseStream)
       $responseBody = $reader.readtoend()
-      $ErrorString = "$($MyInvocation.MyCommand.Name) : The API response received indicates a failure. $($response.StatusCode.value__) : $($response.StatusDescription) : Response Body: $($responseBody)"
+      ## include ErrorDetails content in case therein lies juicy info
+      $ErrorString = "$($MyInvocation.MyCommand.Name) : The API response received indicates a failure. $($response.StatusCode.value__) : $($response.StatusDescription) : Response Body: $($responseBody)`nErrorDetails: '$($_.ErrorDetails)'"
 
       # Log the error with response detail.
-      throw $ErrorString
+      Write-Warning -Message $ErrorString
+      ## throw the actual error, so that the consumer can debug via the actuall ErrorRecord
+      Throw $_
     }
     else
     {
       # No response, log and throw the underlying ex
       $ErrorString = "$($MyInvocation.MyCommand.Name) : Exception occured calling invoke-restmethod. $($_.exception.tostring())"
-      throw $_.exception.tostring()
+      Write-Warning -Message $_.exception.tostring()
+      ## throw the actual error, so that the consumer can debug via the actuall ErrorRecord
+      Throw $_
     }
   }
 
   catch {
     # Not a webexception (may be on PoSH core), log and throw the underlying ex string
     $ErrorString = "$($MyInvocation.MyCommand.Name) : Exception occured calling invoke-restmethod. $($_.exception.tostring())"
-    throw $ErrorString
+    Write-Warning -Message $ErrorString
+    ## throw the actual error, so that the consumer can debug via the actuall ErrorRecord
+    Throw $_
   }
 
 
