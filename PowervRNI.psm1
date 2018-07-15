@@ -94,7 +94,7 @@ function Invoke-vRNIRestMethod
   appropriate JSON object to the caller cmdlet.
 
   .EXAMPLE
-  Invoke-vRNIRestMethod -Method GET -Uri "/api/ni/data-sources/vcenters"
+  PS C:\> Invoke-vRNIRestMethod -Method GET -Uri "/api/ni/data-sources/vcenters"
 
   Performs a 'GET' against the URI /api/ni/data-sources/vcenters and returns
   the JSON object which contains the vRNI response. This call requires the
@@ -103,8 +103,8 @@ function Invoke-vRNIRestMethod
   message to first use Connect-vRNIServer
 
   .EXAMPLE
-  $MyConnection = Connect-vRNIServer -Server vrni-platform.lab.local
-  Invoke-vRNIRestMethod -Method GET -Uri "/api/ni/data-sources/vcenters" -Connection $MyConnection
+  PS C:\> $MyConnection = Connect-vRNIServer -Server vrni-platform.lab.local
+  PS C:\> Invoke-vRNIRestMethod -Method GET -Uri "/api/ni/data-sources/vcenters" -Connection $MyConnection
 
   Connects to a vRNI Platform VM and stores the connection details in a
   variable, which in turn is used for the following cmdlet to retrieve
@@ -151,12 +151,11 @@ function Invoke-vRNIRestMethod
     }
 
     $authtoken = $connection.AuthToken
-    $authtoken_expiry = $connection.AuthTokenExpiry
     $server = $connection.Server
 
     # Check if the authentication token hasn't expired yet
-    if([int][double]::Parse((Get-Date -UFormat %s)) -gt $authtoken_expiry) {
-      throw "The vRNI Authentication token has expired. Please login again using Connect-vRNIServer."
+    if((Get-Date) -gt $connection.AuthTokenExpiry) {
+      throw "The vRNI Authentication token has expired (expired at '$($connection.AuthTokenExpiry.DateTime)'). Please login again using Connect-vRNIServer."
     }
   }
 
@@ -215,23 +214,30 @@ function Invoke-vRNIRestMethod
       $responseStream = $response.GetResponseStream()
       $reader = New-Object system.io.streamreader($responseStream)
       $responseBody = $reader.readtoend()
-      $ErrorString = "$($MyInvocation.MyCommand.Name) : The API response received indicates a failure. $($response.StatusCode.value__) : $($response.StatusDescription) : Response Body: $($responseBody)"
+      ## include ErrorDetails content in case therein lies juicy info
+      $ErrorString = "$($MyInvocation.MyCommand.Name) : The API response received indicates a failure. $($response.StatusCode.value__) : $($response.StatusDescription) : Response Body: $($responseBody)`nErrorDetails: '$($_.ErrorDetails)'"
 
       # Log the error with response detail.
-      throw $ErrorString
+      Write-Warning -Message $ErrorString
+      ## throw the actual error, so that the consumer can debug via the actuall ErrorRecord
+      Throw $_
     }
     else
     {
       # No response, log and throw the underlying ex
       $ErrorString = "$($MyInvocation.MyCommand.Name) : Exception occured calling invoke-restmethod. $($_.exception.tostring())"
-      throw $_.exception.tostring()
+      Write-Warning -Message $_.exception.tostring()
+      ## throw the actual error, so that the consumer can debug via the actuall ErrorRecord
+      Throw $_
     }
   }
 
   catch {
     # Not a webexception (may be on PoSH core), log and throw the underlying ex string
     $ErrorString = "$($MyInvocation.MyCommand.Name) : Exception occured calling invoke-restmethod. $($_.exception.tostring())"
-    throw $ErrorString
+    Write-Warning -Message $ErrorString
+    ## throw the actual error, so that the consumer can debug via the actuall ErrorRecord
+    Throw $_
   }
 
 
@@ -268,32 +274,28 @@ function Connect-vRNIServer
   use to perform authenticated REST API calls.
 
   The connection object contains the authentication token, the expiry
-  timestamp that the token expires and the vRNI server IP.
+  datetime that the token expires and the vRNI server address.
 
 
   .EXAMPLE
   PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local
-
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local,
   the cmdlet will prompt for credentials. Returns the connection object,
   if successful.
 
   .EXAMPLE
   PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password secret
-
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
   with the given local credentials. Returns the connection object, if successful.
 
   .EXAMPLE
   PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password secret -Domain ld.local
-
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
   with the given LDAP credentials. Returns the connection object, if successful.
 
   .EXAMPLE
   PS C:\> $MyConnection = Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password secret
   PS C:\> Get-vRNIDataSource -Connection $MyConnection
-
   Connects to vRNI with the given credentials and then uses the returned
   connection object in the next cmdlet to retrieve all datasources from
   that specific vRNI instance.
@@ -386,7 +388,8 @@ function Connect-vRNIServer
     $connection = [pscustomObject] @{
       "Server" = $Server
       "AuthToken" = $response.token
-      "AuthTokenExpiry" = $response.expiry
+      ## the expiration of the token; currently (vRNI API v1.0), tokens are valid for five (5) hours
+      "AuthTokenExpiry" = (Get-Date "01 Jan 1970").AddMilliseconds($response.expiry).ToLocalTime()
     }
 
     # Remember this as the default connection
@@ -411,12 +414,10 @@ function Disconnect-vRNIServer
 
   .EXAMPLE
   PS C:\> Disconnect-vRNIServer
-
   Invalidates and removes the global default connection variable.
 
   .EXAMPLE
   PS C:\> Disconnect-vRNIServer -Connection $MyConnection
-
   Invalidates the authentication token of a specific connection object
   #>
   param (
@@ -458,15 +459,11 @@ function Get-vRNINodes
   deployment and cluster them.
 
   .EXAMPLE
-
   PS C:\> Get-vRNINodes
-
   Retrieves information about all available nodes.
 
   .EXAMPLE
-
   PS C:\> Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"}
-
   Retrieves information about all available nodes, but filter on the collector VMs.
   #>
   param (
@@ -504,9 +501,7 @@ function Get-vRNIAPIVersion
   that version number.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIAPIVersion
-
   Returns the version number of the vRNI API.
   #>
   param (
@@ -539,15 +534,11 @@ function Get-vRNIDataSource
   switches as the datasource.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIDataSource
-
   Retrieves the details of all datasource types.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIDataSource -DataSourceType nsxv
-
   Retrieves the defaults of all NSX Managers added to vRNI as a datasource.
   #>
   param (
@@ -605,23 +596,15 @@ function New-vRNIDataSource
   correlate and display this data in the interfce.
 
   .EXAMPLE
-
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
   PS C:\> New-vRNIDataSource -DataSourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password secret -CollectorVMId $collectorId -Nickname vc.nsx.local
-
-  First, get the node ID of the collector VM (assuming there's only one), then
-  add a vCenter located at vc.nsx.local to vRNI.
+  First, get the node ID of the collector VM (assuming there's only one), then add a vCenter located at vc.nsx.local to vRNI.
 
   .EXAMPLE
-
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
   PS C:\> $vcId = (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id)
   PS C:\> New-vRNIDataSource -DataSourceType nsxv -FDQN mgr.nsx.local -Username admin -Password secret -Nickname mgr.nsx.local -CollectorVMId $collectorId -Enabled $True -NSXEnableCentralCLI $True -NSXEnableIPFIX $True -NSXvCenterID $vcId
-
-  Adds a new NSX Manager as a data source, auto select the collector ID (if
-  you only have one), enable the NSX Central CLI for collecting data,
-  also enable NSX IPFIX for network datastream insight from the point of view
-  of NSX.
+  Adds a new NSX Manager as a data source, auto select the collector ID (if you only have one), enable the NSX Central CLI for collecting data, also enable NSX IPFIX for network datastream insight from the point of view of NSX.
   #>
 
   [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
@@ -763,17 +746,12 @@ function Remove-vRNIDataSource
   This cmdlet removes a datasources from vRNI.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Remove-vRNIDataSource
-
   Removes a vCenter datasource with the nickname "vc.nsx.local"
 
   .EXAMPLE
-
   PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Remove-vRNIDataSource
-
   Removes a NSX Manager datasource with the nickname "manager.nsx.local"
-
   #>
 
   param (
@@ -788,13 +766,16 @@ function Remove-vRNIDataSource
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
+  process {
+    $DataSource | Foreach-Object {
+      $oThisDatasource = $_
+      # All we have to do is to send a DELETE request to URI /api/ni/$DataSourceType/$DatasourceId, so
+      # form the URI and send the DELETE request to vRNI
+      $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)"
 
-  # All we have to do is to send a DELETE request to URI /api/ni/$DataSourceType/$DatasourceId, so
-  # form the URI and send the DELETE request to vRNI
-  $URI = "/api/ni$($Script:DatasourceInternalURLs.$($DataSource.entity_type))/$($DataSource.entity_id)"
-
-  $response = Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri $URI
-  $response
+      Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri $URI
+    } ## end Foreach-Object
+  } ## end process
 }
 
 function Enable-vRNIDataSource
@@ -812,17 +793,12 @@ function Enable-vRNIDataSource
   This cmdlet enables an existing datasources within vRNI.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Enable-vRNIDataSource
-
   Enables a vCenter datasource with the nickname "vc.nsx.local"
 
   .EXAMPLE
-
   PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Enable-vRNIDataSource
-
   Enables a NSX Manager datasource with the nickname "manager.nsx.local"
-
   #>
 
   param (
@@ -837,13 +813,16 @@ function Enable-vRNIDataSource
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
+  process {
+    $DataSource | Foreach-Object {
+      $oThisDatasource = $_
+      # All we have to do is to send a POST request to URI /api/ni/$DataSourceType/$DatasourceId/enable, so
+      # form the URI and send the request to vRNI
+      $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)/enable"
 
-  # All we have to do is to send a POST request to URI /api/ni/$DataSourceType/$DatasourceId/enable, so
-  # form the URI and send the request to vRNI
-  $URI = "/api/ni$($Script:DatasourceInternalURLs.$($DataSource.entity_type))/$($DataSource.entity_id)/enable"
-
-  $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI
-  $response
+      Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI
+    } ## end Foreach-Object
+  } ## end Process
 }
 
 function Disable-vRNIDataSource
@@ -861,17 +840,12 @@ function Disable-vRNIDataSource
   This cmdlet disables an existing datasources within vRNI.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Disable-vRNIDataSource
-
   Disables a vCenter datasource with the nickname "vc.nsx.local"
 
   .EXAMPLE
-
   PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Disable-vRNIDataSource
-
   Disables a NSX Manager datasource with the nickname "manager.nsx.local"
-
   #>
 
   param (
@@ -886,13 +860,16 @@ function Disable-vRNIDataSource
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
+  process {
+    $DataSource | Foreach-Object {
+      $oThisDatasource = $_
+      # All we have to do is to send a POST request to URI /api/ni/$DataSourceType/$DatasourceId/disable, so
+      # form the URI and send the request to vRNI
+      $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)/disable"
 
-  # All we have to do is to send a POST request to URI /api/ni/$DataSourceType/$DatasourceId/disable, so
-  # form the URI and send the request to vRNI
-  $URI = "/api/ni$($Script:DatasourceInternalURLs.$($DataSource.entity_type))/$($DataSource.entity_id)/disable"
-
-  $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI
-  $response
+      Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI
+    } ## end Foreach-Object
+  } ## end process
 }
 
 #####################################################################################################################
@@ -920,15 +897,11 @@ function Get-vRNIApplication
   vRNI Connection object
 
   .EXAMPLE
-
   PS C:\> Get-vRNIApplication
-
   Show all existing applications and their details.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIApplication -Name '3 Tier App'
-
   Get only the application details of the application named "3 Tier App"
   #>
   param (
@@ -982,6 +955,7 @@ function Get-vRNIApplication
     Write-Verbose ('Body: ' + $listParams['Body'])
   }
 
+
   $hasMoreData = $true
   $counter = 0
   while ($hasMoreData) {
@@ -1030,9 +1004,7 @@ function Get-vRNIApplicationTier
   firewall rules based on an application group.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIApplication My3TierApp | Get-vRNIApplicationTier
-
   Show the tiers for the application container called "My3TierApp"
   #>
   param (
@@ -1049,24 +1021,26 @@ function Get-vRNIApplicationTier
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  # First, get a list of all tier. This returns a list with application IDs which we can use
-  # to retrieve the details of the applications
-  $tier_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($Application.entity_id)/tiers"
+  process {
+    ## do Foreach-Object, so as to enable user to pass multiple Application objects for value of -Application parameter
+    $Application | Foreach-Object {
+      $oThisApplication = $_
+      # First, get a list of all tier. This returns a list with application IDs which we can use
+      # to retrieve the details of the applications
+      $tier_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($oThisApplication.entity_id)/tiers"
 
-  # Use this as a results container
-  $tiers = [System.Collections.ArrayList]@()
+      # Use this as a results container
+      $tiers = [System.Collections.ArrayList]@()
 
-  foreach($tier in $tier_list.results)
-  {
-    # Retrieve application details and store them
-    $tier_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($Application.entity_id)/tiers/$($tier.entity_id)"
-    $tiers.Add($tier_info) | Out-Null
+      foreach($tier in $tier_list.results)
+      {
+        # Retrieve application details and store them
+        $tier_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($oThisApplication.entity_id)/tiers/$($tier.entity_id)"
+        $tiers.Add($tier_info) | Out-Null
 
-    # Don't go on if we've already found the one the user wants specifically
-    if($Name -eq $tier_info.name) {
-      break
-    }
-  }
+        # Don't go on if we've already found the one the user wants specifically
+        if($Name -eq $tier_info.name) {break}
+      }
 
   # Filter out other application tiers if the user wants one specifically
   if ($Name) {
@@ -1089,47 +1063,33 @@ function New-vRNIApplicationTier
   and filter on searches within vRNI. For instance, you can generate recommended
   firewall rules based on an application group.
 
-
   .EXAMPLE
-
   PS C:\> Get-vRNIApplication My3TierApp | New-vRNIApplicationTier -Name web-tier -VMFilters ("name = '3TA-Web01' or name = '3TA-Web02'")
-
-  Create a new tier in the application 'My3TierApp' called 'web-tier' and assign the
-  VMs named '3TA-Web01' and '3TA-Web02' to this tier.
+  Create a new tier in the application 'My3TierApp' called 'web-tier' and assign the VMs named '3TA-Web01' and '3TA-Web02' to this tier.
 
   .EXAMPLE
-
   PS C:\> $security_group_id = (Get-vRNISecurityGroup SG-3Tier-App).entity_id
   PS C:\> Get-vRNIApplication My3TierApp | New-vRNIApplicationTier -Name app-tier -VMFilters ("name = '3TA-App01'", "security_groups.entity_id = '$security_group_id'")
-
   Create a new tier in the application 'My3TierApp' called 'web-tier' and assign the
   VMs named '3TA-Web01' and '3TA-Web02' to this tier.
 
-
   .EXAMPLE
-
-  PS C:\> Get-vRNIApplication IP-Network | New-vRNIApplicationTier -Name IP-Set-1 -IPFilters ("100.194.0.0/24", "192.168.1.1", "192.168.10.0/27")
-
+  PS C:\> Get-vRNIApplication IP-Network | New-vRNIApplicationTier -Name IP-Set-1 -IPFilters 100.194.0.0/24, 192.168.1.1, 192.168.10.0/27
   This retrieves the existing application called 'IP-Network' and creates a new tier
   inside it called 'IP-Set-1' with a /24 subnet, a single host and a /27 subnet.
 
   .EXAMPLE
-
-  PS C:\> Get-vRNIApplication IP-Network | New-vRNIApplicationTier -Name IP-Host-2 -IPFilters ("172.16.0.10")
-
+  PS C:\> Get-vRNIApplication IP-Network | New-vRNIApplicationTier -Name IP-Host-2 -IPFilters 172.16.0.10
   This retrieves the existing application called 'IP-Network' and creates a new tier
   inside it called 'IP-Host-2' with a single host on the IP 172.16.0.10.
 
-
   .PARAMETER Filters
-
   The filters within an application tier determine what VMs will be placed in that
   application. Currently, only these options are supported:
 
   Single VM:                   "name = '3TA-App01'"
   Multiple VMs:                "name = '3TA-App01' or name = '3TA-App02'"
   VMs with a NSX Security Tag: "security_groups.entity_id = '18230:82:604573173'"
-
   #>
 
   # To keep backwards compatibility with 1.0
@@ -1158,60 +1118,65 @@ function New-vRNIApplicationTier
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  if(!$Filters -And !$VMFilters -And !$IPFilters) {
-    throw "Please provide at least one filter."
-  }
+  begin {
+    if(!$Filters -And !$VMFilters -And !$IPFilters) {
+      throw "Please provide at least one filter."
+    }
 
-  # Format request with all given data
-  $requestFormat = @{
-    "name" = $Name
-    "group_membership_criteria" = @()
-  }
+    # Format request with all given data
+    $requestFormat = @{
+      "name" = $Name
+      "group_membership_criteria" = @()
+    }
 
-  # Backwards compatibility with 1.0 - if the old -Filters are given, transfer it to $VMFilters
-  if ($pscmdlet.ParameterSetName -eq "VMFilter") {
-    $VMFilters = $Filters
-  }
+    # Backwards compatibility with 1.0 - if the old -Filters are given, transfer it to $VMFilters
+    if ($pscmdlet.ParameterSetName -eq "VMFilter") {
+      $VMFilters = $Filters
+    }
 
-  # If supplied, go through the VM filters and build the call
-  if($VMFilters)
-  {
-    foreach($filter in $VMFilters)
+    # If supplied, go through the VM filters and build the call
+    if($VMFilters)
+    {
+      foreach($filter in $VMFilters)
+      {
+        $criteria_record = @{}
+        $criteria_record.membership_type = "SearchMembershipCriteria"
+        $criteria_record.search_membership_criteria = @{
+          "entity_type" = "BaseVirtualMachine"
+          "filter" = $filter
+        }
+        $requestFormat.group_membership_criteria += $criteria_record
+      }
+    }
+
+    # If supplied, go through the IP filters and build the call
+    if($IPFilters)
     {
       $criteria_record = @{}
-      $criteria_record.membership_type = "SearchMembershipCriteria"
-      $criteria_record.search_membership_criteria = @{
-        "entity_type" = "BaseVirtualMachine"
-        "filter" = $filter
+      $criteria_record.membership_type = "IPAddressMembershipCriteria"
+      $criteria_record.ip_address_membership_criteria = @{}
+      $criteria_record.ip_address_membership_criteria.ip_addresses = @()
+
+      foreach($ipset in $IPFilters)
+      {
+        $criteria_record.ip_address_membership_criteria.ip_addresses += $ipset
       }
+
       $requestFormat.group_membership_criteria += $criteria_record
     }
-  }
 
-  # If supplied, go through the IP filters and build the call
-  if($IPFilters)
-  {
-    $criteria_record = @{}
-    $criteria_record.membership_type = "IPAddressMembershipCriteria"
-    $criteria_record.ip_address_membership_criteria = @{}
-    $criteria_record.ip_address_membership_criteria.ip_addresses = @()
+    Write-Debug $requestFormat
 
-    foreach($ipset in $IPFilters)
-    {
-      $criteria_record.ip_address_membership_criteria.ip_addresses += $ipset
-    }
+    # Convert the hash to JSON, form the URI and send the request to vRNI
+    $requestBody = ConvertTo-Json $requestFormat -Depth 5
+  } ## end begin
 
-    $requestFormat.group_membership_criteria += $criteria_record
-  }
-
-  Write-Debug $requestFormat
-
-  # Convert the hash to JSON, form the URI and send the request to vRNI
-  $requestBody = ConvertTo-Json $requestFormat -Depth 5
-  $result = Invoke-vRNIRestMethod -Connection $Connection -Method POST -URI "/api/ni/groups/applications/$($Application.entity_id)/tiers" -Body $requestBody
-
-  $result
-
+  process {
+    $Application | Foreach-Object {
+      $oThisApplication = $_
+      Invoke-vRNIRestMethod -Connection $Connection -Method POST -URI "/api/ni/groups/applications/$($oThisApplication.entity_id)/tiers" -Body $requestBody
+    } ## end Foreach-Object
+  } ## end process
 }
 
 
@@ -1228,9 +1193,7 @@ function Remove-vRNIApplicationTier
   firewall rules based on an application group.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIApplication My3TierApp | Get-vRNIApplicationTier web-tier | Remove-vRNIApplicationTier
-
   Remove the tier 'web-tier' from the application container called "My3TierApp"
   #>
   param (
@@ -1244,10 +1207,13 @@ function Remove-vRNIApplicationTier
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  # Send the DELETE request and show the result
-  $result = Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -URI "/api/ni/groups/applications/$($ApplicationTier.application.entity_id)/tiers/$($ApplicationTier.entity_id)"
-
-  $result
+  process {
+    $ApplicationTier | Foreach-Object {
+      $oThisApplicationTier = $_
+      # Send the DELETE request and show the result
+      Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -URI "/api/ni/groups/applications/$($oThisApplicationTier.application.entity_id)/tiers/$($oThisApplicationTier.entity_id)"
+    } ## end Foreach-Object
+  } ## end process
 }
 
 function New-vRNIApplication
@@ -1263,11 +1229,8 @@ function New-vRNIApplication
   firewall rules based on an application group.
 
   .EXAMPLE
-
   PS C:\> New-vRNIApplication -Name My3TierApp
-
   Create a new application container with the name My3TierApp.
-
   #>
   param (
     [Parameter (Mandatory=$false, Position=1)]
@@ -1305,9 +1268,7 @@ function Remove-vRNIApplication
   firewall rules based on an application group.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIApplication My3TierApp | Remove-vRNIApplication
-
   Remove the application container called "My3TierApp"
   #>
   param (
@@ -1321,10 +1282,13 @@ function Remove-vRNIApplication
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  # Send the DELETE request and show the result
-  $result = Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -URI "/api/ni/groups/applications/$($Application.entity_id)"
-
-  $result
+  process {
+    $Application | Foreach-Object {
+      $oThisApplication = $_
+      # Send the DELETE request and show the result
+      Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -URI "/api/ni/groups/applications/$($oThisApplication.entity_id)"
+    } ## end Foreach-Object
+  } ## end process
 }
 
 #####################################################################################################################
@@ -1345,17 +1309,12 @@ function Get-vRNIEntity
   any entity and the objects related to that entity.
 
   .EXAMPLE
-
-  PS C:\> Get-vRNIEntity -Entity_URI "security-groups"
-
+  PS C:\> Get-vRNIEntity -Entity_URI security-groups
   Get all security groups in the vRNI environment.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIEntity -Entity_URI "hosts" -Name "esxi01.lab"
-
   Get the entity object for the hypervisor host called "esxi01.lab"
-
   #>
   param (
     [Parameter (Mandatory=$true)]
@@ -1500,11 +1459,8 @@ function Get-vRNIEntityName
   actual useable name.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIEntityName -EntityID 14307:562:1274720802
-
   Get the name of the entity with ID 14307:562:1274720802
-
   #>
   param (
     [Parameter (Mandatory=$true, Position=1)]
@@ -1534,24 +1490,17 @@ function Get-vRNIProblem
   In the end you're supposed to solve these problems and have no open ones.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIProblem
-
   Get a list of all open problems
 
-  .EXAMPLE
-
+ .EXAMPLE
   PS C:\> Get-vRNIProblem | Where {$_.severity -eq "CRITICAL"}
-
   Get a list of all open problems which have the CRITICAL severity (and are
   probably important to solve quickly)
 
   .EXAMPLE
-
   PS C:\> Get-vRNIProblem -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds())
-
   Get all problems that have been open in the last 10 minutes.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -1587,36 +1536,25 @@ function Get-vRNIFlow
   This cmdlet will let you export these flows
 
   .EXAMPLE
-
   PS C:\> Get-vRNIFlow
-
   Get the last 100 flows (100 = default)
 
   .EXAMPLE
-
   PS C:\> Get-vRNIFlow -Limit 10
-
   Get the last 10 flows
 
   .EXAMPLE
-
   PS C:\> Get-vRNIFlow -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds())
-
   Get all flows that occurred in the last 10 minutes.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIFlow -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()) | Where {$_.protocol -eq "TCP"}
-
   Get all flows that occurred in the last 10 minutes and ignore all flows
   that are not TCP based.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIFlow -StartTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()-600) -EndTime ([DateTimeOffset]::Now.ToUnixTimeSeconds()) | Where {$_.traffic_type -eq "INTERNET_TRAFFIC"}
-
   Get only internet-based (in or out) flows that occurred in the last 10 minutes.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -1663,25 +1601,17 @@ function Get-vRNIVM
   and this cmdlet will help you discover these VMs.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIVM
-
-  List all VMs in your vRNI environment (note: this may take a while if you
-  have a lot of VMs)
+  List all VMs in your vRNI environment (note: this may take a while if you have a lot of VMs)
 
   .EXAMPLE
-
   PS C:\> Get-vRNIVM -Name my-vm-name
-
   Retrieve only the VM object called "my-vm-name"
 
   .EXAMPLE
-
   PS C:\> $vcenter_entity_id = (Get-vRNIvCenter | Where {$_.name -eq "vcenter.lab"}).entity_id
   PS C:\> Get-vRNIVM | Where {$_.vcenter_manager.entity_id -eq $vcenter_entity_id}
-
   Get all VMs that are attached to the vCenter named "vcenter.lab"
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -1712,12 +1642,8 @@ function Get-vRNIVMvNIC
   and this cmdlet will help you discover these VM vNICs.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIVMvNIC
-
-  List all VM vNICs in your vRNI environment (note: this may take a while if you
-  have a lot of VMs)
-
+  List all VM vNICs in your vRNI environment (note: this may take a while if you have a lot of VMs)
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -1754,17 +1680,12 @@ function Get-vRNIvCenter
   and this cmdlet will help you discover these vCenters.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIvCenter
-
   Get all vCenters in the vRNI environment.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIvCenter vcenter.lab
-
   Retrieve the vCenter object for the one called "vcenter.lab"
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -1795,11 +1716,8 @@ function Get-vRNIvCenterFolder
   and this cmdlet will help you discover these folders.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIvCenterFolder
-
   Get all vCenter folders in the vRNI environment.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -1830,11 +1748,8 @@ function Get-vRNIvCenterDatacenter
   environment and this cmdlet will help you discover these Datacenters.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIvCenterDatacenter
-
   Get all vCenter Datacenters in the vRNI environment.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -1865,11 +1780,8 @@ function Get-vRNIvCenterCluster
   environment and this cmdlet will help you discover these Clusters.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIvCenterCluster
-
   Get all vCenter Clusters in the vRNI environment.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -1905,29 +1817,20 @@ function Get-vRNIHost
   and this cmdlet will help you discover these hosts.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIHost
-
   Get all hypervisor hosts in the vRNI environment.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIHost esxi01.lab
-
   Retrieve the ESXi host object for the one called "esxi01.lab"
 
   .EXAMPLE
-
   PS C:\> Get-vRNIHost | Select name, service_tag
-
   Get a list of all hosts with their hardware service tag.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIHost | Where {$_.nsx_manager -ne ""}
-
   Get all hosts that are managed by a NSX Manager.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -1958,11 +1861,8 @@ function Get-vRNIHostVMKNic
   environment and this cmdlet will help you discover these vmknids.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIHostVMKNic
-
   Get all host vmknics in the vRNI environment.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -1999,17 +1899,12 @@ function Get-vRNISecurityGroup
   and this cmdlet will help you discover these SGs.
 
   .EXAMPLE
-
   PS C:\> Get-vRNISecurityGroup
-
   Get all security groups in the vRNI environment.
 
   .EXAMPLE
-
   PS C:\> Get-vRNISecurityGroup 3TA-Management-Access
-
   Retrieve the security group object for the one called "3TA-Management-Access"
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -2040,17 +1935,12 @@ function Get-vRNISecurityTag
   and this cmdlet will help you discover these STs.
 
   .EXAMPLE
-
   PS C:\> Get-vRNISecurityTag
-
   Get all security tags in the vRNI environment.
 
   .EXAMPLE
-
   PS C:\> Get-vRNISecurityTag ST-3TA-Management
-
   Retrieve the security tag object for the one called "ST-3TA-Management"
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -2081,11 +1971,8 @@ function Get-vRNIIPSet
   and this cmdlet will help you discover these IP sets.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIIPSet
-
   Get all IP Sets in the vRNI environment.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -2116,11 +2003,8 @@ function Get-vRNIService
   and this cmdlet will help you discover these Services.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIService
-
   Get all NSX Services in the vRNI environment.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -2151,11 +2035,8 @@ function Get-vRNIServiceGroup
   and this cmdlet will help you discover these groups.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIServiceGroup
-
   Get all NSX Service Groups in the vRNI environment.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -2186,11 +2067,8 @@ function Get-vRNINSXManager
   and this cmdlet will help you discover these NSX Managers.
 
   .EXAMPLE
-
   PS C:\> Get-vRNINSXManager
-
   Get all NSX Managers in the vRNI environment.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -2227,11 +2105,8 @@ function Get-vRNIFirewallRule
   and this cmdlet will help you discover these rules.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIFirewallRule
-
   Get all firewall rules in the vRNI environment.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -2262,17 +2137,12 @@ function Get-vRNIL2Network
   and this cmdlet will help you discover these layer 2 networks.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIL2Network
-
   Get all layer 2 networks in the vRNI environment.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIL2Network | Where {$_.entity_type -eq "VxlanLayer2Network"}
-
   Only show all VXLAN layer 2 networks.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -2303,15 +2173,11 @@ function Get-vRNIDistributedSwitch
   and this cmdlet will help you discover these VDSes.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIDistributedSwitch
-
   Get all vSphere Distributed Switches in the vRNI environment.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIDistributedSwitch LabSwitch
-
   Get only the VDS called 'LabSwitch'
 
   #>
@@ -2344,17 +2210,12 @@ function Get-vRNIDistributedSwitchPortGroup
   and this cmdlet will help you discover these portgroups.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIDistributedSwitchPortGroup
-
   Get all VDS Portgroups in the vRNI environment.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIDistributedSwitchPortGroup Web-Tier
-
   Get only the portgroup called 'Web-Tier'
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -2391,11 +2252,8 @@ function Get-vRNIDatastore
   and this cmdlet will help you discover these datastores.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIDatastore
-
   Get all datastores in the vRNI environment.
-
   #>
   param (
     [Parameter (Mandatory=$false)]
@@ -2437,22 +2295,16 @@ function Get-vRNIRecommendedRules
   Per default this function uses a 14 day analysis period.
 
   .EXAMPLE
-
   PS C:\> Get-vRNIRecommendedRules -ApplicationID (Get-vRNIApplication vRNI).entity_id
-
-  This will return the recommended firewall rules for the application
-  called 'vRNI'
+  This will return the recommended firewall rules for the application called 'vRNI'
 
   .EXAMPLE
-
   PS C:\> $sevenDaysAgo = (Get-Date).AddDays(-7)
   PS C:\> $start = [int][double]::Parse((Get-Date -Date $sevenDaysAgo -UFormat %s))
   PS C:\> $end = [int][double]::Parse((Get-Date -UFormat %s))
   PS C:\> Get-vRNIRecommendedRules -ApplicationID (Get-vRNIApplication vRNI).entity_id -StartTime $start -EndTime $end
-
   This will return the recommended firewall rules for the application
   called 'vRNI' from analysis on the last 7 days.
-
   #>
   param (
     [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
