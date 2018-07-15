@@ -37,6 +37,30 @@ $Script:DatasourceInternalURLs.Add("HPVCManagerDataSource", "/data-sources/hpvc-
 $Script:DatasourceInternalURLs.Add("CheckpointFirewallDataSource", "/data-sources/checkpoint-firewalls")
 $Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panorama-firewalls")
 
+# This list will be used in Get-vRNIEntity to map entity URLs to their IDs so we can use those IDs in /entities/fetch
+$Script:EntityURLtoIdMapping = @{}
+$Script:EntityURLtoIdMapping.Add("problems", "ProblemEvent")
+$Script:EntityURLtoIdMapping.Add("vms", "VirtualMachine")
+$Script:EntityURLtoIdMapping.Add("vnics", "Vnic")
+$Script:EntityURLtoIdMapping.Add("hosts", "Host")
+$Script:EntityURLtoIdMapping.Add("clusters", "Cluster")
+$Script:EntityURLtoIdMapping.Add("vc-datacenters", "VCDatacenter")
+$Script:EntityURLtoIdMapping.Add("datastores", "Datastore")
+$Script:EntityURLtoIdMapping.Add("vmknics", "Vmknic")
+$Script:EntityURLtoIdMapping.Add("layer2-networks", "VxlanLayer2Network")
+$Script:EntityURLtoIdMapping.Add("ip-sets", "NSXIPSet")
+$Script:EntityURLtoIdMapping.Add("flows", "Flow")
+$Script:EntityURLtoIdMapping.Add("security-groups", "NSXSecurityGroup")
+$Script:EntityURLtoIdMapping.Add("security-tags", "SecurityTag")
+$Script:EntityURLtoIdMapping.Add("firewall-rules", "NSXFirewallRule")
+$Script:EntityURLtoIdMapping.Add("firewalls", "NSXDistributedFirewall")
+$Script:EntityURLtoIdMapping.Add("services", "NSXService")
+$Script:EntityURLtoIdMapping.Add("service-groups", "NSXServiceGroup")
+$Script:EntityURLtoIdMapping.Add("vcenter-managers", "VCenterManager")
+$Script:EntityURLtoIdMapping.Add("nsx-managers", "NSXVManager")
+$Script:EntityURLtoIdMapping.Add("distributed-virtual-switches", "DistributedVirtualSwitch")
+$Script:EntityURLtoIdMapping.Add("distributed-virtual-portgroups", "DistributedVirtualPortgroup")
+
 # Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing some of the base functions &
 # principles on which this module is built on.
 
@@ -1395,7 +1419,6 @@ function Get-vRNIEntity
 
     Write-Debug "Using URI: $($URI)"
 
-
     $listParams = @{
       Connection = $Connection
       Method = 'GET'
@@ -1403,13 +1426,15 @@ function Get-vRNIEntity
     }
 
     # support filtering by a VM by using search instead of returning all entities
-    if ($PSBoundParameters.ContainsKey('Name') -and $Name -ne '' -and $Entity_URI -eq 'vms') {
+    if ($PSBoundParameters.ContainsKey('Name') -and $Name -ne '') {
       $listParams['URI'] = '/api/ni/search'
       $listParams['Body'] = @{
-        entity_type = 'VirtualMachine'
+         entity_type = $Script:EntityURLtoIdMapping.$Entity_URI
         filter = "Name = '$Name'"
       } | ConvertTo-Json
       $listParams['Method'] = 'POST'
+
+      $finished = $true
     }
 
     # Get a list of all entities
@@ -1425,6 +1450,48 @@ function Get-vRNIEntity
     # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
     if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
       $finished = $true
+    }
+
+    # If we're using version 1.1.0 or greater of the vRNI API - we can use the /entities/fetch bulk method of getting entity details. Much more efficient.
+    if($Script:vRNI_API_Version -ge [System.Version]"1.1.0")
+    {
+      $requestFormat = @{
+        "entity_ids" = $entity_list.results
+      }
+      $requestBody = ConvertTo-Json $requestFormat
+      $entity_info = Invoke-vRNIRestMethod -Connection $Connection -Method POST -URI "/api/ni/entities/fetch" -Body $requestBody
+
+      foreach($entity in $entity_info.results)
+      {
+        $entity = $entity.entity
+        # If we're retrieving flows, add the time of the main flow to this specific flow record
+        if($Entity_URI -eq "flows") {
+          $entity | Add-Member -Name "time" -value $entity.time -MemberType NoteProperty
+        }
+
+        $entities.Add($entity) | Out-Null
+
+        if($Name -eq $entity.name) {
+          $finished = $true
+          break
+        }
+
+        $current_count++
+
+        # If we are limiting the output, break from the loops and return results
+        if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
+          $finished = $true
+          break
+        }
+      }
+
+      # Check remaining items, if it's less than the default size, reduce the next page size
+      if($size -gt ($total_count - $current_count)) {
+        $size = ($total_count - $current_count)
+      }
+
+      # continue the while(!$finished) loop
+      continue
     }
 
     # Go through the entities individually and store them in the results array
@@ -1452,7 +1519,8 @@ function Get-vRNIEntity
         $finished = $true
         break
       }
-    }
+    } ## end foreach($sg in $entity_list.results)
+
     # Check remaining items, if it's less than the default size, reduce the next page size
     if($size -gt ($total_count - $current_count)) {
       $size = ($total_count - $current_count)
@@ -1460,6 +1528,7 @@ function Get-vRNIEntity
 
   }
 
+  # if a single entity name was requested, filter on name
   if ($Name) {
     $entities | Where-Object { $_.name -eq $Name }
   }
@@ -1467,6 +1536,7 @@ function Get-vRNIEntity
     $entities
   }
 }
+
 
 function Get-vRNIEntityName
 {
