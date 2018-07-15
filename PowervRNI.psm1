@@ -921,14 +921,10 @@ function Get-vRNIApplication
   #>
   param (
     [Parameter(Mandatory=$false, Position=1, ParameterSetName = 'Filter')]
-    [string[]] $Name,
-
-    [Parameter(ParameterSetName = 'Filter')]
-    [string] $Creator,
-
+      [string[]] $Name,
     [Parameter(Mandatory=$false)]
-    [ValidateNotNullOrEmpty()]
-    [PSCustomObject] $Connection = $defaultvRNIConnection
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject] $Connection = $defaultvRNIConnection
   )
 
   $applications = [System.Collections.ArrayList]@()
