@@ -255,7 +255,7 @@ function Invoke-vRNIRestMethod
   #$ServicePoint.CloseConnectionGroup("") | out-null
 
   # Return result
-  $response
+  if($response) { $response }
 }
 
 #####################################################################################################################
@@ -398,6 +398,9 @@ function Connect-vRNIServer
     # Remember this as the default connection
     Set-Variable -name defaultvRNIConnection -value $connection -scope Global
 
+    # Retrieve the API version so we can use that in determining if we can use newer API endpoints
+    $Script:vRNI_API_Version = (Get-vRNIAPIVersion).api_version
+
     # Return the connection
     $connection
   }
@@ -508,13 +511,22 @@ function Get-vRNIAPIVersion
   Returns the version number of the vRNI API.
   #>
   param (
+    [Parameter (Mandatory=$false)]
+      # This param will determine if you see the stored version that was retrieved upon Connect-vRNIServer or retrieve
+      # a fresh one from the API
+      [ValidateNotNullOrEmpty()]
+      [bool]$ShowStoredVersion = $False,
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
       [ValidateNotNullOrEmpty()]
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  $version = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/info/version"
+  $version = $Script:vRNI_API_Version
+  if($ShowStoredVersion -eq $False) {
+    $version = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/info/version"
+  }
+
   $version
 }
 
