@@ -1042,13 +1042,11 @@ function Get-vRNIApplicationTier
         if($Name -eq $tier_info.name) {break}
       }
 
-  # Filter out other application tiers if the user wants one specifically
-  if ($Name) {
-    $tiers | Where-Object { $_.name -eq $Name }
-  }
-  else {
-    $tiers
-  }
+      # Filter out other application tiers if the user wants one specifically
+      if ($Name) {$tiers | Where-Object { $_.name -eq $Name }}
+      else {$tiers}
+    } ## end Foreach-Object
+  } ## end process
 }
 
 function New-vRNIApplicationTier
