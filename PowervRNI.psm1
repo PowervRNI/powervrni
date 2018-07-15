@@ -159,6 +159,9 @@ function Invoke-vRNIRestMethod
     }
   }
 
+  # Sleep a tiny bit so we don't overload the vRNI API when using consecutive commands
+  Start-Sleep -m 100
+
   # Create a header option dictionary, to be used for authentication (if we have an existing session) and other RESTy stuff
   $headerDict = @{}
   $headerDict.add("Content-Type", "application/json")
@@ -973,9 +976,6 @@ function Get-vRNIApplication
       $applications.Add($app_info) | Out-Null
 
       $counter++
-
-      # Don't overload the API, pause a bit
-      Start-Sleep -m 100
     }
 
     $remaining = $applicationResponse.total_count - $counter
@@ -1419,8 +1419,6 @@ function Get-vRNIEntity
         $finished = $true
         break
       }
-      # Don't overload the API, pause a bit
-      Start-Sleep -m 100
 
       $current_count++
 
