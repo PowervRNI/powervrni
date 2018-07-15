@@ -12,7 +12,7 @@
 RootModule = 'PowervRNI.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0.33'
+ModuleVersion = '1.0.35'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -69,19 +69,19 @@ DotNetFrameworkVersion = '4.0'
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = 'Connect-vRNIServer', 'Disable-vRNIDataSource', 
-               'Disconnect-vRNIServer', 'Enable-vRNIDataSource', 
-               'Get-vRNIAPIVersion', 'Get-vRNIApplication', 
-               'Get-vRNIApplicationTier', 'Get-vRNIDataSource', 'Get-vRNIDatastore', 
-               'Get-vRNIDistributedSwitch', 'Get-vRNIDistributedSwitchPortGroup', 
-               'Get-vRNIFirewallRule', 'Get-vRNIFlow', 'Get-vRNIHost', 
-               'Get-vRNIHostVMKNic', 'Get-vRNIIPSet', 'Get-vRNIL2Network', 
-               'Get-vRNINodes', 'Get-vRNINSXManager', 'Get-vRNIProblem', 
-               'Get-vRNISecurityGroup', 'Get-vRNISecurityTag', 'Get-vRNIService', 
-               'Get-vRNIServiceGroup', 'Get-vRNIvCenter', 'Get-vRNIvCenterCluster', 
-               'Get-vRNIvCenterDatacenter', 'Get-vRNIvCenterFolder', 'Get-vRNIVM', 
-               'Get-vRNIVMvNIC', 'New-vRNIApplication', 'New-vRNIApplicationTier', 
-               'New-vRNIDataSource', 'Remove-vRNIApplication', 
+FunctionsToExport = 'Connect-vRNIServer', 'Disable-vRNIDataSource',
+               'Disconnect-vRNIServer', 'Enable-vRNIDataSource',
+               'Get-vRNIAPIVersion', 'Get-vRNIApplication',
+               'Get-vRNIApplicationTier', 'Get-vRNIDataSource', 'Get-vRNIDatastore',
+               'Get-vRNIDistributedSwitch', 'Get-vRNIDistributedSwitchPortGroup',
+               'Get-vRNIFirewallRule', 'Get-vRNIFlow', 'Get-vRNIHost',
+               'Get-vRNIHostVMKNic', 'Get-vRNIIPSet', 'Get-vRNIL2Network',
+               'Get-vRNINodes', 'Get-vRNINSXManager', 'Get-vRNIProblem',
+               'Get-vRNISecurityGroup', 'Get-vRNISecurityTag', 'Get-vRNIService',
+               'Get-vRNIServiceGroup', 'Get-vRNIvCenter', 'Get-vRNIvCenterCluster',
+               'Get-vRNIvCenterDatacenter', 'Get-vRNIvCenterFolder', 'Get-vRNIVM',
+               'Get-vRNIVMvNIC', 'New-vRNIApplication', 'New-vRNIApplicationTier',
+               'New-vRNIDataSource', 'Remove-vRNIApplication',
                'Remove-vRNIApplicationTier', 'Remove-vRNIDataSource'
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
