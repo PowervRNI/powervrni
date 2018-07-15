@@ -7,8 +7,8 @@
 
 # This is the version of PowervRNI. The publish script will also append ".build number",
 # put this in a "major.minor" format
-$PowervRNI_Version = "1.0"
-    
+$PowervRNI_Version = "1.1"
+
 $FunctionsToExport = @(
     'Connect-vRNIServer',
     'Disable-vRNIDataSource',
@@ -48,7 +48,7 @@ $FunctionsToExport = @(
     'Remove-vRNIDataSource'
 )
 
-# Manifest settings 
+# Manifest settings
 $Manifest_Common = @{
     RootModule = 'PowervRNI.psm1'
     GUID = 'a34be6be-3dc1-457a-aea3-d4263481ed79'

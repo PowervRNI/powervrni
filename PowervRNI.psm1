@@ -535,22 +535,13 @@ function Get-vRNIAPIVersion
   Returns the version number of the vRNI API.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # This param will determine if you see the stored version that was retrieved upon Connect-vRNIServer or retrieve
-      # a fresh one from the API
-      [ValidateNotNullOrEmpty()]
-      [bool]$ShowStoredVersion = $False,
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
       [ValidateNotNullOrEmpty()]
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  $version = $Script:vRNI_API_Version
-  if($ShowStoredVersion -eq $False) {
-    $version = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/info/version"
-  }
-
+  $version = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/info/version"
   $version
 }
 

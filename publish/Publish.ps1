@@ -24,11 +24,11 @@ try {  if(Get-Command git) { <# we have git, so continue! #> } }
 catch {  throw "For this script to run, we need git. I couldn't find git." }
 
 # Get build number
-$BuildNumber = (git log --oneline).Count  
+$BuildNumber = (git log --oneline).Count
 # Format version number
 $PowervRNI_Version = $PowervRNI_Version + '.' + $BuildNumber.ToString().Trim()
 # Test version
-if (-not ($PowervRNI_Version -as [version])) { 
+if (-not ($PowervRNI_Version -as [version])) {
     throw "$PowervRNI_Version is not a valid version number. Try again."
 }
 # Add the version to the manifest options
@@ -48,6 +48,6 @@ Copy-Item -Path "$currentPath/../PowervRNI.psm1" "$currentPath/psgallery/"
 # Copy manifest file to publish directory
 Copy-Item -Path "$currentPath/../PowervRNI.psd1" "$currentPath/psgallery/"
 
-Publish-Module -NuGetApiKey $NuGetApiKey -Path "$currentPath/psgallery/PowervRNI"
+Publish-Module -NuGetApiKey $NuGetApiKey -Path "$currentPath/psgallery/PowervRNI" -ReleaseNotes "Change Log can be found here: https://github.com/PowervRNI/powervrni/blob/master/ChangeLog.md"
 
 Write-Host -ForegroundColor Yellow "PowervRNI $PowervRNI_Version is now published to the PowerShell Gallery! Also push the new files to GitHub."
