@@ -399,7 +399,7 @@ function Connect-vRNIServer
     Set-Variable -name defaultvRNIConnection -value $connection -scope Global
 
     # Retrieve the API version so we can use that in determining if we can use newer API endpoints
-    $Script:vRNI_API_Version = (Get-vRNIAPIVersion).api_version
+    $Script:vRNI_API_Version = [System.Version]((Get-vRNIAPIVersion).api_version)
 
     # Return the connection
     $connection
@@ -940,6 +940,7 @@ function Get-vRNIApplication
     Uri = "/api/ni/groups/applications?size=$size"
   }
 
+  # If a filter has been given, use the search endpoint to more efficiently find the right applications
   if ($PSCmdlet.ParameterSetName -eq 'Filter') {
     $listParams['Method'] = 'POST'
     $listParams['Uri'] = '/api/ni/search'
@@ -948,8 +949,12 @@ function Get-vRNIApplication
       entity_type = 'Application'
     }
 
+    # Build the search filter
     $filter = @()
+    # If there's an application name specified, figure out if it's a single name or an array of names
+    # and format the search filter appropriately
     if ($Name) {
+      # Multiple application names
       if ($Name.Count -gt 1) {
         $nameArray = @()
         foreach ($nameItem in $Name) {
@@ -957,23 +962,35 @@ function Get-vRNIApplication
         }
         $nameSearchString = " in (" + ($nameArray -join ',') + ")"
       }
+      # Single application name
       else {
         $nameSearchString = " = '$Name'"
       }
 
       $filter += "(Name $nameSearchString)"
-    }
+    } ## end if ($Name)
 
     $body['filter'] = $filter -join ' and '
 
     $listParams['Body'] = $body | ConvertTo-Json
     Write-Verbose ('Body: ' + $listParams['Body'])
+  } ## end if ($PSCmdlet.ParameterSetName -eq 'Filter')
+  else
+  {
+    # With version 1.1.0 of the API - there's a single endpoint to retrieve all
+    if($Script:vRNI_API_Version -ge [System.Version]"1.1.0")
+    {
+      $listParams['Uri'] = '/api/ni/groups/applications/fetch?size=2500'
+      $applications = Invoke-vRNIRestMethod @listParams
+      $applications.results
+      return
+    }
   }
-
 
   $hasMoreData = $true
   $counter = 0
-  while ($hasMoreData) {
+  while ($hasMoreData)
+  {
     $applicationResponse = Invoke-vRNIRestMethod @listParams
 
     Write-Verbose ("$($applicationResponse.total_count) applications to process")
