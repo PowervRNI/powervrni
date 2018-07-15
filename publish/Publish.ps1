@@ -44,9 +44,9 @@ $content = Get-Content "$currentPath/../PowervRNI.psd1"
 [System.IO.File]::WriteAllLines("$currentPath/../PowervRNI.psd1", $content)
 
 # Copy module file to publish directory
-Copy-Item -Path "$currentPath/../PowervRNI.psm1" "$currentPath/psgallery/"
+Copy-Item -Path "$currentPath/../PowervRNI.psm1" "$currentPath/psgallery/PowervRNI/"
 # Copy manifest file to publish directory
-Copy-Item -Path "$currentPath/../PowervRNI.psd1" "$currentPath/psgallery/"
+Copy-Item -Path "$currentPath/../PowervRNI.psd1" "$currentPath/psgallery/PowervRNI/"
 
 Publish-Module -NuGetApiKey $NuGetApiKey -Path "$currentPath/psgallery/PowervRNI" -ReleaseNotes "Change Log can be found here: https://github.com/PowervRNI/powervrni/blob/master/ChangeLog.md"
 
