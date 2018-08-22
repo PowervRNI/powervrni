@@ -753,6 +753,14 @@ function New-vRNIDataSource
     $requestFormat.central_cli_enabled = $NSXEnableCentralCLI
   }
 
+  # When adding a Cisco or Dell switch, provide the switch_type key in the body
+  if($DataSourceType -eq "ciscoswitch") {
+    $requestFormat.switch_type = $CiscoSwitchType
+  }
+  if($DataSourceType -eq "dellswitch") {
+    $requestFormat.switch_type = $DellSwitchType
+  }
+
   # Convert the hash to JSON, form the URI and send the request to vRNI
   $requestBody = ConvertTo-Json $requestFormat
   $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])"
