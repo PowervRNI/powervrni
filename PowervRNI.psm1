@@ -910,6 +910,178 @@ function Disable-vRNIDataSource
   } ## end process
 }
 
+
+
+function Get-vRNIDataSourceSNMPConfig
+{
+  <#
+  .SYNOPSIS
+  Retrieves the SNMP configuration of a switch datasource from vRealize Network Insight
+
+  .DESCRIPTION
+  Physical devices like switches and UCS systems have SNMP options, which vRNI can
+  read out to provide interface bandwidth graphs. This cmdlet allows you to retrieve
+  the SNMP configuration of a specific data source.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource | Where {$_.entity_type -eq "CiscoSwitchDataSource"} | Get-vRNIDataSourceSNMPConfig
+  Gets the SNMP configuration for all Cisco switch data sources
+  #>
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNIDataSource
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$DataSource,
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+    $DataSource | Foreach-Object {
+      $oThisDatasource = $_
+
+      # Sanity check on the data source type: only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP config
+      if($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
+        $oThisDatasource.entity_type -ne "BrocadeSwitchDataSource" -And $oThisDatasource.entity_type -ne "JuniperSwitchDataSource" -And
+        $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource") {
+        throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP configuration."
+      }
+
+      # All we have to do is to send a GET request to URI /api/ni/$DataSourceType/$DatasourceId/snmp-config
+      $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)/snmp-config"
+
+      $result = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri $URI
+      $result
+    } ## end Foreach-Object
+  } ## end process
+}
+
+function Set-vRNIDataSourceSNMPConfig
+{
+  <#
+  .SYNOPSIS
+  Updates the SNMP configuration of a switch or UCS datasource within vRealize Network Insight
+
+  .DESCRIPTION
+  Physical devices like switches and UCS systems have SNMP options, which vRNI can
+  read out to provide interface bandwidth graphs. This cmdlet allows you to set
+  the SNMP configuration of a specific data source.
+
+  .EXAMPLE
+  PS C:\> $snmpOptions = @{ "Enabled" = $true; "Username" = "snmpv3user"; "ContextName" = " "; "AuthenticationType" = "MD5";  "AuthenticationPassword" = "ult1m4t3p4ss";  "PrivacyType" = "AES128";  "PrivacyPassword" = "s0pr1v4t3"; }
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "Core01"} | Set-vRNIDataSourceSNMPConfig @snmpOptions
+  Configures SNMPv3 for a data source named 'Core01'
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource -DataSourceType ciscoswitch | Set-vRNIDataSourceSNMPConfig -Enabled $true -Community "qwerty1234"
+  Configured SNMPv2 on all Cisco switch datasources.
+
+  #>
+
+  [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNIDataSource
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$DataSource,
+
+    [Parameter (Mandatory=$false, ParameterSetName="SNMPv2c")]
+      # Enable SNMP?
+      [ValidateNotNullOrEmpty()]
+      [bool]$Enabled = $true,
+
+    # This param is only required when configuring SNMP v2c
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv2c")]
+      # SNMP v2c Community string
+      [ValidateNotNullOrEmpty()]
+      [string]$Community,
+
+    # These params are only required when configuring SNMP v3
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
+      # SNMP v3 Username
+      [ValidateNotNullOrEmpty()]
+      [string]$Username,
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
+      # SNMP v3 Context name
+      [ValidateNotNullOrEmpty()]
+      [string]$ContextName,
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
+      # SNMP v3 Context name
+      [ValidateSet ("MD5", "SHA", "NO_AUTH")]
+      [string]$AuthenticationType,
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
+      # SNMP v3 Authentication Password
+      [ValidateNotNullOrEmpty()]
+      [string]$AuthenticationPassword,
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
+      # SNMP v3 Privacy Type
+      [ValidateSet ("AES", "DES", "AES128", "AES192", "AES256", "3DES", "NO_PRIV")]
+      [string]$PrivacyType,
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
+      # SNMP v3 Privacy Password
+      [ValidateNotNullOrEmpty()]
+      [string]$PrivacyPassword,
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+    $DataSource | Foreach-Object {
+      $oThisDatasource = $_
+
+      # Sanity check on the data source type: only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP config
+
+      if($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
+        $oThisDatasource.entity_type -ne "BrocadeSwitchDataSource" -And $oThisDatasource.entity_type -ne "JuniperSwitchDataSource" -And
+        $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource") {
+        throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP configuration."
+      }
+
+      # Format request with all given data
+      $requestFormat = @{
+        "snmp_enabled" = $Enabled
+      }
+
+      # if SNMPv2 parameters are given, build the snmp_2c var
+      if ($pscmdlet.ParameterSetName -eq "SNMPv2c") {
+        $requestFormat.snmp_version = "v2c"
+        $requestFormat.config_snmp_2c = @{
+          "community_string" = $Community
+        }
+      }
+
+      # if SNMPv3 parameters are given, build the snmp_3 var
+      if ($pscmdlet.ParameterSetName -eq "SNMPv3") {
+        $requestFormat.snmp_version = "v3"
+        $requestFormat.config_snmp_3 = @{
+          "username" = $Username
+          "context_name" = $ContextName
+          "authentication_type" = $AuthenticationType
+          "authentication_password" = $AuthenticationPassword
+          "privacy_type" = $PrivacyType
+          "privacy_password" = $PrivacyPassword
+        }
+      }
+
+      # All we have to do now is to send a PUT request to URI /api/ni/$DataSourceType/$DatasourceId/snmp-config with the right body
+      $requestBody = ConvertTo-Json $requestFormat
+      $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)/snmp-config"
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method PUT -Uri $URI -Body $requestBody
+    } ## end Foreach-Object
+  } ## end process
+}
+
+
+
 #####################################################################################################################
 #####################################################################################################################
 #######################################  Application Management #####################################################
