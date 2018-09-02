@@ -79,7 +79,7 @@ connection_state : CONNECTED
 entity_id        : 14307:4:1142332887
 ```
 
-More examples and usage documentation to come.
+More examples are available in the examples/ directory and [here](https://lostdomain.org/tag/powervrni/)
 
 
 ## Contact
