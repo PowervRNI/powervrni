@@ -1,5 +1,12 @@
 ## ChangeLog
 
+### v1.2
+
+@smitmartijn:
+
+- \[new] Add Get-vRNIDataSourceSNMPConfig and Set-vRNIDataSourceSNMPConfig to retrieve and configure SNMP settings for certain data sources
+- \[fix] Fixed New-vRNIDataSource when using a Cisco or Dell switch type (it didn't add the required switch type API value)
+
 ### v1.1
 
 @smitmartijn:
