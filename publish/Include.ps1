@@ -11,6 +11,7 @@ $PowervRNI_Version = "1.2"
 
 $FunctionsToExport = @(
     'Connect-vRNIServer',
+    'Connect-NIServer',
     'Disable-vRNIDataSource',
     'Disconnect-vRNIServer',
     'Enable-vRNIDataSource',

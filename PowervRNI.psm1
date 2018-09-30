@@ -96,7 +96,6 @@ function _PvRNI_init
   if($script:PvRNI_PlatformType -eq "Desktop") {
     if (-not ("TrustAllCertsPolicy" -as [type])) {
       Add-Type $TrustAllCertsPolicy
-      Write-Host "TrustAllCertsPolicy"
     }
   }
 }
@@ -190,8 +189,13 @@ function Invoke-vRNIRestMethod
   $headerDict = @{}
   $headerDict.add("Content-Type", "application/json")
 
-  if($authtoken -ne "") {
+  # Add the auth token to the headers, if the CSPToken is not filled out
+  if($authtoken -ne "" -And $connection.CSPToken -eq "") {
     $headerDict.add("Authorization", "NetworkInsight $authtoken")
+  }
+  # Add the Cloud Services Platform token if available (means we're using Network Insight as a Service)
+  if($connection.CSPToken -ne "") {
+    $headerDict.add("csp-auth-token", $connection.CSPToken)
   }
 
   # Form the URL to call and write in our journal about this call
@@ -210,17 +214,20 @@ function Invoke-vRNIRestMethod
     $invokeRestMethodParams.Add("Body", $body)
   }
 
-  # On PowerShell Desktop, add a trigger to ignore SSL certificate checks
-  if(($script:PvRNI_PlatformType -eq "Desktop"))
+  # On PowerShell Desktop, add a trigger to ignore SSL certificate checks, if we're not using Network Insight as a Service
+  if($connection.CSPToken -eq "")
   {
-    # Allow untrusted certificate presented by the remote system to be accepted
-    if([System.Net.ServicePointManager]::CertificatePolicy.tostring() -ne 'TrustAllCertsPolicy') {
-      [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+    if(($script:PvRNI_PlatformType -eq "Desktop"))
+    {
+      # Allow untrusted certificate presented by the remote system to be accepted
+      if([System.Net.ServicePointManager]::CertificatePolicy.tostring() -ne 'TrustAllCertsPolicy') {
+        [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+      }
     }
-  }
-  # Core (for now) uses a different mechanism to manipulating [System.Net.ServicePointManager]::CertificatePolicy
-  if(($script:PvRNI_PlatformType -eq "Core")) {
-    $invokeRestMethodParams.Add("SkipCertificateCheck", $true)
+    # Core (for now) uses a different mechanism to manipulating [System.Net.ServicePointManager]::CertificatePolicy
+    if(($script:PvRNI_PlatformType -eq "Core")) {
+      $invokeRestMethodParams.Add("SkipCertificateCheck", $true)
+    }
   }
 
   # Only use TLS as SSL connection to vRNI
@@ -468,6 +475,66 @@ function Disconnect-vRNIServer
   }
 
   $result
+}
+
+function Connect-NIServer
+{
+  <#
+  .SYNOPSIS
+  Connects to the Network Insight Service on the VMware Cloud Services 
+  Platform and constructs a connection object.
+
+  .DESCRIPTION
+  The Connect-NIServer cmdlet returns a connection object that contains
+  an authentication token which the rest of the cmdlets in this module
+  use to perform authenticated REST API calls.
+
+  The connection object contains the Cloud Services Platform token, the expiry
+  datetime that the token expires and the NI server address.
+
+  The RefreshToken can be found in your profile, here: https://console.cloud.vmware.com/csp/gateway/portal/#/user/tokens
+
+  .EXAMPLE
+  PS C:\> Connect-NIServer -RefreshToken xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  Connect to the VMware Cloud Services Portal with your specified Refresh Token. 
+  The cmdlet will connect to the CSP, validate the token and will return an
+  access token. Returns the connection object, if successful.
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      # The Refresh Token from your VMware Cloud Services Portal
+      [ValidateNotNullOrEmpty()]
+      [string]$RefreshToken
+  )
+
+  # Only use TLS as SSL connection to vRNI
+  [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
+
+  $URL = "https://console.cloud.vmware.com/csp/gateway/am/api/auth/api-tokens/authorize?refresh_token=$($RefreshToken)"
+  $response = Invoke-WebRequest -URI $URL -ContentType "application/json" -Method POST -UseBasicParsing -Headers @{"csp-auth-token"="$($RefreshToken)"}
+  Write-Debug "Response: $($response)"
+
+  if($response)
+  {
+    $response = ($response | ConvertFrom-Json)
+
+    # Setup a custom object to contain the parameters of the connection, including the URL to the CSP API & Access token
+    $connection = [pscustomObject] @{
+      "Server" = "api.mgmt.cloud.vmware.com/ni"
+      "CSPToken" = $response.access_token
+      ## the expiration of the token; currently (vRNI API v1.0), tokens are valid for five (5) hours
+      "AuthTokenExpiry" = (Get-Date).AddSeconds($response.expires_in).ToLocalTime()
+    }
+
+    # Remember this as the default connection
+    Set-Variable -name defaultvRNIConnection -value $connection -scope Global
+
+    # Retrieve the API version so we can use that in determining if we can use newer API endpoints
+    $Script:vRNI_API_Version = [System.Version]((Get-vRNIAPIVersion).api_version)
+
+    # Return the connection
+    $connection
+  }
 }
 
 #####################################################################################################################
