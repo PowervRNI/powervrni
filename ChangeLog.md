@@ -1,5 +1,11 @@
 ## ChangeLog
 
+### v1.3
+
+@smitmartijn:
+
+- \[new] Add Connect-NIServer to connect to the Network Insight as a Service on the VMware Cloud Services.
+
 ### v1.2
 
 @smitmartijn:

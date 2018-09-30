@@ -7,7 +7,7 @@
 
 # This is the version of PowervRNI. The publish script will also append ".build number",
 # put this in a "major.minor" format
-$PowervRNI_Version = "1.2"
+$PowervRNI_Version = "1.3"
 
 $FunctionsToExport = @(
     'Connect-vRNIServer',

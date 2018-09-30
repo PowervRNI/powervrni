@@ -1,7 +1,7 @@
 # vRealize Network Insight PowerShell module
 # Martijn Smit (@smitmartijn)
 # msmit@vmware.com
-# Version 1.0
+# Version 1.3
 
 
 # Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource
@@ -65,7 +65,6 @@ $Script:EntityURLtoIdMapping.Add("distributed-virtual-portgroups", "DistributedV
 # principles on which this module is built on.
 
 # Run at module load time to determine a few things about the platform this module is running on.
-# TODO: use a psd1 to mask this function to the outside world
 function _PvRNI_init
 {
   # $PSVersionTable.PSEdition property does not exist pre v5.  We need to do a few things in
@@ -96,7 +95,6 @@ function _PvRNI_init
   if($script:PvRNI_PlatformType -eq "Desktop") {
     if (-not ("TrustAllCertsPolicy" -as [type])) {
       Add-Type $TrustAllCertsPolicy
-      Write-Host "TrustAllCertsPolicy"
     }
   }
 }
@@ -190,8 +188,13 @@ function Invoke-vRNIRestMethod
   $headerDict = @{}
   $headerDict.add("Content-Type", "application/json")
 
-  if($authtoken -ne "") {
+  # Add the auth token to the headers, if the CSPToken is not filled out
+  if($authtoken -ne "" -And $connection.CSPToken -eq "") {
     $headerDict.add("Authorization", "NetworkInsight $authtoken")
+  }
+  # Add the Cloud Services Platform token if available (means we're using Network Insight as a Service)
+  if($connection.CSPToken -ne "") {
+    $headerDict.add("csp-auth-token", $connection.CSPToken)
   }
 
   # Form the URL to call and write in our journal about this call
@@ -210,17 +213,20 @@ function Invoke-vRNIRestMethod
     $invokeRestMethodParams.Add("Body", $body)
   }
 
-  # On PowerShell Desktop, add a trigger to ignore SSL certificate checks
-  if(($script:PvRNI_PlatformType -eq "Desktop"))
+  # On PowerShell Desktop, add a trigger to ignore SSL certificate checks, if we're not using Network Insight as a Service
+  if($connection.CSPToken -eq "")
   {
-    # Allow untrusted certificate presented by the remote system to be accepted
-    if([System.Net.ServicePointManager]::CertificatePolicy.tostring() -ne 'TrustAllCertsPolicy') {
-      [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+    if(($script:PvRNI_PlatformType -eq "Desktop"))
+    {
+      # Allow untrusted certificate presented by the remote system to be accepted
+      if([System.Net.ServicePointManager]::CertificatePolicy.tostring() -ne 'TrustAllCertsPolicy') {
+        [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+      }
     }
-  }
-  # Core (for now) uses a different mechanism to manipulating [System.Net.ServicePointManager]::CertificatePolicy
-  if(($script:PvRNI_PlatformType -eq "Core")) {
-    $invokeRestMethodParams.Add("SkipCertificateCheck", $true)
+    # Core (for now) uses a different mechanism to manipulating [System.Net.ServicePointManager]::CertificatePolicy
+    if(($script:PvRNI_PlatformType -eq "Core")) {
+      $invokeRestMethodParams.Add("SkipCertificateCheck", $true)
+    }
   }
 
   # Only use TLS as SSL connection to vRNI
@@ -468,6 +474,66 @@ function Disconnect-vRNIServer
   }
 
   $result
+}
+
+function Connect-NIServer
+{
+  <#
+  .SYNOPSIS
+  Connects to the Network Insight Service on the VMware Cloud Services 
+  Platform and constructs a connection object.
+
+  .DESCRIPTION
+  The Connect-NIServer cmdlet returns a connection object that contains
+  an authentication token which the rest of the cmdlets in this module
+  use to perform authenticated REST API calls.
+
+  The connection object contains the Cloud Services Platform token, the expiry
+  datetime that the token expires and the NI server address.
+
+  The RefreshToken can be found in your profile, here: https://console.cloud.vmware.com/csp/gateway/portal/#/user/tokens
+
+  .EXAMPLE
+  PS C:\> Connect-NIServer -RefreshToken xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  Connect to the VMware Cloud Services Portal with your specified Refresh Token. 
+  The cmdlet will connect to the CSP, validate the token and will return an
+  access token. Returns the connection object, if successful.
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      # The Refresh Token from your VMware Cloud Services Portal
+      [ValidateNotNullOrEmpty()]
+      [string]$RefreshToken
+  )
+
+  # Only use TLS as SSL connection to vRNI
+  [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
+
+  $URL = "https://console.cloud.vmware.com/csp/gateway/am/api/auth/api-tokens/authorize?refresh_token=$($RefreshToken)"
+  $response = Invoke-WebRequest -URI $URL -ContentType "application/json" -Method POST -UseBasicParsing -Headers @{"csp-auth-token"="$($RefreshToken)"}
+  Write-Debug "Response: $($response)"
+
+  if($response)
+  {
+    $response = ($response | ConvertFrom-Json)
+
+    # Setup a custom object to contain the parameters of the connection, including the URL to the CSP API & Access token
+    $connection = [pscustomObject] @{
+      "Server" = "api.mgmt.cloud.vmware.com/ni"
+      "CSPToken" = $response.access_token
+      ## the expiration of the token; currently (vRNI API v1.0), tokens are valid for five (5) hours
+      "AuthTokenExpiry" = (Get-Date).AddSeconds($response.expires_in).ToLocalTime()
+    }
+
+    # Remember this as the default connection
+    Set-Variable -name defaultvRNIConnection -value $connection -scope Global
+
+    # Retrieve the API version so we can use that in determining if we can use newer API endpoints
+    $Script:vRNI_API_Version = [System.Version]((Get-vRNIAPIVersion).api_version)
+
+    # Return the connection
+    $connection
+  }
 }
 
 #####################################################################################################################
@@ -753,6 +819,14 @@ function New-vRNIDataSource
     $requestFormat.central_cli_enabled = $NSXEnableCentralCLI
   }
 
+  # When adding a Cisco or Dell switch, provide the switch_type key in the body
+  if($DataSourceType -eq "ciscoswitch") {
+    $requestFormat.switch_type = $CiscoSwitchType
+  }
+  if($DataSourceType -eq "dellswitch") {
+    $requestFormat.switch_type = $DellSwitchType
+  }
+
   # Convert the hash to JSON, form the URI and send the request to vRNI
   $requestBody = ConvertTo-Json $requestFormat
   $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])"
@@ -901,6 +975,178 @@ function Disable-vRNIDataSource
     } ## end Foreach-Object
   } ## end process
 }
+
+
+
+function Get-vRNIDataSourceSNMPConfig
+{
+  <#
+  .SYNOPSIS
+  Retrieves the SNMP configuration of a switch datasource from vRealize Network Insight
+
+  .DESCRIPTION
+  Physical devices like switches and UCS systems have SNMP options, which vRNI can
+  read out to provide interface bandwidth graphs. This cmdlet allows you to retrieve
+  the SNMP configuration of a specific data source.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource | Where {$_.entity_type -eq "CiscoSwitchDataSource"} | Get-vRNIDataSourceSNMPConfig
+  Gets the SNMP configuration for all Cisco switch data sources
+  #>
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNIDataSource
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$DataSource,
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+    $DataSource | Foreach-Object {
+      $oThisDatasource = $_
+
+      # Sanity check on the data source type: only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP config
+      if($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
+        $oThisDatasource.entity_type -ne "BrocadeSwitchDataSource" -And $oThisDatasource.entity_type -ne "JuniperSwitchDataSource" -And
+        $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource") {
+        throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP configuration."
+      }
+
+      # All we have to do is to send a GET request to URI /api/ni/$DataSourceType/$DatasourceId/snmp-config
+      $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)/snmp-config"
+
+      $result = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri $URI
+      $result
+    } ## end Foreach-Object
+  } ## end process
+}
+
+function Set-vRNIDataSourceSNMPConfig
+{
+  <#
+  .SYNOPSIS
+  Updates the SNMP configuration of a switch or UCS datasource within vRealize Network Insight
+
+  .DESCRIPTION
+  Physical devices like switches and UCS systems have SNMP options, which vRNI can
+  read out to provide interface bandwidth graphs. This cmdlet allows you to set
+  the SNMP configuration of a specific data source.
+
+  .EXAMPLE
+  PS C:\> $snmpOptions = @{ "Enabled" = $true; "Username" = "snmpv3user"; "ContextName" = " "; "AuthenticationType" = "MD5";  "AuthenticationPassword" = "ult1m4t3p4ss";  "PrivacyType" = "AES128";  "PrivacyPassword" = "s0pr1v4t3"; }
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "Core01"} | Set-vRNIDataSourceSNMPConfig @snmpOptions
+  Configures SNMPv3 for a data source named 'Core01'
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource -DataSourceType ciscoswitch | Set-vRNIDataSourceSNMPConfig -Enabled $true -Community "qwerty1234"
+  Configured SNMPv2 on all Cisco switch datasources.
+
+  #>
+
+  [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNIDataSource
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$DataSource,
+
+    [Parameter (Mandatory=$false, ParameterSetName="SNMPv2c")]
+      # Enable SNMP?
+      [ValidateNotNullOrEmpty()]
+      [bool]$Enabled = $true,
+
+    # This param is only required when configuring SNMP v2c
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv2c")]
+      # SNMP v2c Community string
+      [ValidateNotNullOrEmpty()]
+      [string]$Community,
+
+    # These params are only required when configuring SNMP v3
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
+      # SNMP v3 Username
+      [ValidateNotNullOrEmpty()]
+      [string]$Username,
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
+      # SNMP v3 Context name
+      [ValidateNotNullOrEmpty()]
+      [string]$ContextName,
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
+      # SNMP v3 Context name
+      [ValidateSet ("MD5", "SHA", "NO_AUTH")]
+      [string]$AuthenticationType,
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
+      # SNMP v3 Authentication Password
+      [ValidateNotNullOrEmpty()]
+      [string]$AuthenticationPassword,
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
+      # SNMP v3 Privacy Type
+      [ValidateSet ("AES", "DES", "AES128", "AES192", "AES256", "3DES", "NO_PRIV")]
+      [string]$PrivacyType,
+    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
+      # SNMP v3 Privacy Password
+      [ValidateNotNullOrEmpty()]
+      [string]$PrivacyPassword,
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+    $DataSource | Foreach-Object {
+      $oThisDatasource = $_
+
+      # Sanity check on the data source type: only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP config
+
+      if($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
+        $oThisDatasource.entity_type -ne "BrocadeSwitchDataSource" -And $oThisDatasource.entity_type -ne "JuniperSwitchDataSource" -And
+        $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource") {
+        throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP configuration."
+      }
+
+      # Format request with all given data
+      $requestFormat = @{
+        "snmp_enabled" = $Enabled
+      }
+
+      # if SNMPv2 parameters are given, build the snmp_2c var
+      if ($pscmdlet.ParameterSetName -eq "SNMPv2c") {
+        $requestFormat.snmp_version = "v2c"
+        $requestFormat.config_snmp_2c = @{
+          "community_string" = $Community
+        }
+      }
+
+      # if SNMPv3 parameters are given, build the snmp_3 var
+      if ($pscmdlet.ParameterSetName -eq "SNMPv3") {
+        $requestFormat.snmp_version = "v3"
+        $requestFormat.config_snmp_3 = @{
+          "username" = $Username
+          "context_name" = $ContextName
+          "authentication_type" = $AuthenticationType
+          "authentication_password" = $AuthenticationPassword
+          "privacy_type" = $PrivacyType
+          "privacy_password" = $PrivacyPassword
+        }
+      }
+
+      # All we have to do now is to send a PUT request to URI /api/ni/$DataSourceType/$DatasourceId/snmp-config with the right body
+      $requestBody = ConvertTo-Json $requestFormat
+      $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)/snmp-config"
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method PUT -Uri $URI -Body $requestBody
+    } ## end Foreach-Object
+  } ## end process
+}
+
+
 
 #####################################################################################################################
 #####################################################################################################################

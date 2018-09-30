@@ -1,7 +1,7 @@
 # vRealize Network Insight PowerShell module
 # Martijn Smit (@smitmartijn)
 # msmit@vmware.com
-# Version 1.2
+# Version 1.3
 
 
 # Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource
@@ -65,7 +65,6 @@ $Script:EntityURLtoIdMapping.Add("distributed-virtual-portgroups", "DistributedV
 # principles on which this module is built on.
 
 # Run at module load time to determine a few things about the platform this module is running on.
-# TODO: use a psd1 to mask this function to the outside world
 function _PvRNI_init
 {
   # $PSVersionTable.PSEdition property does not exist pre v5.  We need to do a few things in
