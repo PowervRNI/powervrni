@@ -7,7 +7,7 @@
 
 # This is the version of PowervRNI. The publish script will also append ".build number",
 # put this in a "major.minor" format
-$PowervRNI_Version = "1.3"
+$PowervRNI_Version = "1.4"
 
 $FunctionsToExport = @(
     'Connect-vRNIServer',
@@ -22,6 +22,8 @@ $FunctionsToExport = @(
     'Get-vRNIDatastore',
     'Get-vRNIDistributedSwitch',
     'Get-vRNIDistributedSwitchPortGroup',
+    'Get-vRNIEntity',
+    'Get-vRNIEntityName',
     'Get-vRNIFirewallRule',
     'Get-vRNIFlow',
     'Get-vRNIHost',
@@ -31,6 +33,8 @@ $FunctionsToExport = @(
     'Get-vRNINodes',
     'Get-vRNINSXManager',
     'Get-vRNIProblem',
+    'Get-vRNIRecommendedRules',
+    'Get-vRNIRecommendedRulesNsxBundle',
     'Get-vRNISecurityGroup',
     'Get-vRNISecurityTag',
     'Get-vRNIService',
@@ -42,6 +46,7 @@ $FunctionsToExport = @(
     'Get-vRNIVM',
     'Get-vRNIVMvNIC',
     'Get-vRNIDataSourceSNMPConfig',
+    'Invoke-vRNIRestMethod',
     'New-vRNIApplication',
     'New-vRNIApplicationTier',
     'New-vRNIDataSource',

@@ -1,7 +1,7 @@
 # vRealize Network Insight PowerShell module
 # Martijn Smit (@smitmartijn)
 # msmit@vmware.com
-# Version 1.3
+# Version 1.4
 
 
 # Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource

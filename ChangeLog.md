@@ -1,5 +1,12 @@
 ## ChangeLog
 
+### v1.4 - 2018-10-13
+
+@smitmartijn:
+
+- \[new] Add cmdlet Get-vRNIRecommendedRulesNsxBundle to download a zip file with the recommended firewall rules which can be used by the Importer Tool to send the firewall rules to NSX
+- \[bug-fix] Fix a random connection issue to on-prem vRNI by fixing the on-prem vs SaaS detection
+
 ### v1.3
 
 @smitmartijn:
