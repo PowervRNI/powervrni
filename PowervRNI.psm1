@@ -152,6 +152,10 @@ function Invoke-vRNIRestMethod
     [Parameter (ParameterSetName="ConnectionObj")]
       # Content to be sent to server when method is PUT/POST/PATCH
       [string]$Body = "",
+    [Parameter (Mandatory=$false,ParameterSetName="Parameter")]
+    [Parameter (ParameterSetName="ConnectionObj")]
+      # Save content to file
+      [string]$OutFile = "",
     [Parameter (Mandatory=$false,ParameterSetName="ConnectionObj")]
       # Pre-populated connection object as returned by Connect-vRNIServer
       [psObject]$Connection
@@ -160,7 +164,7 @@ function Invoke-vRNIRestMethod
   if ($pscmdlet.ParameterSetName -eq "ConnectionObj")
   {
     # Ensure we were either called with a connection or there is a defaultConnection (user has called Connect-vRNIServer)
-    if ($connection -eq $null)
+    if ($null -eq $connection)
     {
       # Now we need to assume that defaultvRNIConnection does not exist...
       if ( -not (test-path variable:global:defaultvRNIConnection) ) {
@@ -189,12 +193,16 @@ function Invoke-vRNIRestMethod
   $headerDict.add("Content-Type", "application/json")
 
   # Add the auth token to the headers, if the CSPToken is not filled out
-  if($authtoken -ne "" -And $connection.CSPToken -eq "") {
+  if($authtoken -ne "") {
     $headerDict.add("Authorization", "NetworkInsight $authtoken")
   }
   # Add the Cloud Services Platform token if available (means we're using Network Insight as a Service)
-  if($connection.CSPToken -ne "") {
-    $headerDict.add("csp-auth-token", $connection.CSPToken)
+  if($null -ne $connection) 
+  {
+    if($null -ne $connection.CSPToken) {
+      $headerDict.remove("Authorization")
+      $headerDict.add("csp-auth-token", $connection.CSPToken)
+    }
   }
 
   # Form the URL to call and write in our journal about this call
@@ -209,12 +217,25 @@ function Invoke-vRNIRestMethod
     "Uri" = $URL;
   }
 
+  # If a body for a POST request has been specified, add it to the parameters for Invoke-RestMethod
   if($Body -ne "") {
     $invokeRestMethodParams.Add("Body", $body)
   }
 
-  # On PowerShell Desktop, add a trigger to ignore SSL certificate checks, if we're not using Network Insight as a Service
-  if($connection.CSPToken -eq "")
+  # If we want to save the output to a file (Get-vRNIRecommendedRulesNsxBundle uses this), specify -OutFile
+  if($OutFile -ne "") {
+    $invokeRestMethodParams.Add("OutFile", $OutFile)
+  }
+
+  # Add a trigger to ignore SSL certificate checks, if we're not using Network Insight as a Service (self-hosted usually have self-signed certificates)
+  $SkipSSLCheck = $True
+  if($null -ne $connection) {
+    if($connection.CSPToken -eq "") {
+      $SkipSSLCheck = $False
+    }
+  }
+
+  if($SkipSSLCheck -eq $True)
   {
     if(($script:PvRNI_PlatformType -eq "Desktop"))
     {
@@ -2685,6 +2706,89 @@ function Get-vRNIRecommendedRules
   $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/micro-seg/recommended-rules" -Body $requestBody
 
   $response.results
+}
+
+
+function Get-vRNIRecommendedRulesNsxBundle
+{
+  <#
+  .SYNOPSIS
+  Retrieve the recommended firewall rules of a specific application bundled in the NSX-v format for
+  processing with the Rules Importer Tool (more on that at a later date)
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  required firewall rules to implement micro-segmentation. This means
+  you have a starting point when it comes to micro-segmentation and
+  implementing the needed firewall rules. This function retrieves the
+  recommended firewall rules for an application.
+
+  Per default this function uses a 14 day analysis period.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIRecommendedRulesNsxBundle -ApplicationID (Get-vRNIApplication vRNI).entity_id
+  This will return the recommended firewall rules for the application called 'vRNI'
+
+  .EXAMPLE
+  PS C:\> $sevenDaysAgo = (Get-Date).AddDays(-7)
+  PS C:\> $start = [int][double]::Parse((Get-Date -Date $sevenDaysAgo -UFormat %s))
+  PS C:\> $end = [int][double]::Parse((Get-Date -UFormat %s))
+  PS C:\> Get-vRNIRecommendedRulesNsxBundle -ApplicationID (Get-vRNIApplication vRNI).entity_id -StartTime $start -EndTime $end
+  This will return the recommended firewall rules for the application
+  called 'vRNI' from analysis on the last 7 days.
+  #>
+  param (
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to start looking up records
+      [int]$StartTime = 0,
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to stop looking up records
+      [int]$EndTime = 0,
+    [Parameter (Mandatory=$false)]
+      # The application entity ID for which to retrieve the recommended rules
+      [string]$ApplicationID = "",
+    [Parameter (Mandatory=$true)]
+      # This cmdlet outputs a zip file specified by the filename here
+      [string]$OutFile,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  if($PSCmdlet.ParameterSetName -eq "TIMELIMIT" -And ($StartTime -gt 0 -And $EndTime -gt 0))
+  {
+    if($StartTime -gt $EndTime) {
+      throw "StartTime cannot be greated than EndTime"
+    }
+  }
+  else
+  {
+    # Use a timeframe of 14 days by default
+    $twoWeeksAgo = (Get-Date).AddDays(-14)
+    $StartTime = [int][double]::Parse((Get-Date -Date $twoWeeksAgo -UFormat %s))
+    $EndTime = [int][double]::Parse((Get-Date -UFormat %s))
+  }
+
+  # TODO: also allow lookups between 2 application tiers
+
+  # Format request with all given data
+  $requestFormat = @{
+    "group_1" = @{
+      "entity" = @{
+        "entity_type" = "Application"
+        "entity_id" = $ApplicationID
+      }
+    }
+    "time_range" = @{
+      "start_time" = $StartTime
+      "end_time" = $EndTime
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/micro-seg/recommended-rules/nsx" -Body $requestBody -OutFile $OutFile
 }
 
 
