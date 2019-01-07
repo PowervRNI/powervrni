@@ -19,7 +19,9 @@ $Script:DatasourceURLs.Add("hponeview", @("/data-sources/hpov-managers"))
 $Script:DatasourceURLs.Add("hpvcmanager", @("/data-sources/hpvc-managers"))
 $Script:DatasourceURLs.Add("checkpointfirewall", @("/data-sources/checkpoint-firewalls"))
 $Script:DatasourceURLs.Add("panfirewall", @("/data-sources/panorama-firewalls"))
-$Script:DatasourceURLs.Add("all", @("/data-sources/vcenters", "/data-sources/nsxv-managers", "/data-sources/cisco-switches", "/data-sources/arista-switches", "/data-sources/dell-switches", "/data-sources/brocade-switches", "/data-sources/juniper-switches", "/data-sources/ucs-managers", "/data-sources/hpov-managers", "/data-sources/hpvc-managers", "/data-sources/checkpoint-firewalls", "/data-sources/panorama-firewalls"))
+$Script:DatasourceURLs.Add("infoblox", @("/data-sources/infoblox-managers"))
+$Script:DatasourceURLs.Add("nsxpolicymanager", @("/data-sources/policy-managers"))
+$Script:DatasourceURLs.Add("all", @("/data-sources/vcenters", "/data-sources/nsxv-managers", "/data-sources/cisco-switches", "/data-sources/arista-switches", "/data-sources/dell-switches", "/data-sources/brocade-switches", "/data-sources/juniper-switches", "/data-sources/ucs-managers", "/data-sources/hpov-managers", "/data-sources/hpvc-managers", "/data-sources/checkpoint-firewalls", "/data-sources/panorama-firewalls", "/data-sources/infoblox-managers", "/data-sources/policy-managers"))
 
 # Keep another list handy which translates the internal vRNI Names for datasources to their relative URLs
 $Script:DatasourceInternalURLs = @{}
@@ -36,6 +38,8 @@ $Script:DatasourceInternalURLs.Add("HPOneViewManagerDataSource", "/data-sources/
 $Script:DatasourceInternalURLs.Add("HPVCManagerDataSource", "/data-sources/hpvc-managers")
 $Script:DatasourceInternalURLs.Add("CheckpointFirewallDataSource", "/data-sources/checkpoint-firewalls")
 $Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panorama-firewalls")
+$Script:DatasourceInternalURLs.Add("InfobloxManagerDataSource", "/data-sources/infoblox-managers")
+$Script:DatasourceInternalURLs.Add("PolicyManagerDataSource", "/data-sources/policy-managers")
 
 # This list will be used in Get-vRNIEntity to map entity URLs to their IDs so we can use those IDs in /entities/fetch
 $Script:EntityURLtoIdMapping = @{}
@@ -60,6 +64,7 @@ $Script:EntityURLtoIdMapping.Add("vcenter-managers", "VCenterManager")
 $Script:EntityURLtoIdMapping.Add("nsx-managers", "NSXVManager")
 $Script:EntityURLtoIdMapping.Add("distributed-virtual-switches", "DistributedVirtualSwitch")
 $Script:EntityURLtoIdMapping.Add("distributed-virtual-portgroups", "DistributedVirtualPortgroup")
+$Script:EntityURLtoIdMapping.Add("firewall-managers", "CheckpointManager")
 
 # Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing some of the base functions &
 # principles on which this module is built on.
@@ -729,7 +734,7 @@ function New-vRNIDataSource
   param (
     [Parameter (Mandatory=$true)]
       # Which datasource type to create - TODO: make this a dynamic param to get the values from $Script:data
-      [ValidateSet ("vcenter", "nsxv", "nsxt", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall")]
+      [ValidateSet ("vcenter", "nsxv", "nsxt", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall", "infoblox", "nsxpolicymanager")]
       [string]$DataSourceType,
     [Parameter (Mandatory=$true)]
       # Username to use to login to the datasource
@@ -2581,6 +2586,42 @@ function Get-vRNIDistributedSwitchPortGroup
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
   $results = Get-vRNIEntity -Entity_URI "distributed-virtual-portgroups" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNICheckPointManagers
+{
+  <#
+  .SYNOPSIS
+  Get available CheckPoint Firewall Managers from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all CheckPoint Firewall Managers in your environment
+  and this cmdlet will help you discover these managers.
+
+  .EXAMPLE
+  PS C:\> Get-vRNICheckPointManagers
+  Get all CheckPoint Firewall Managers in the vRNI environment.
+
+  .EXAMPLE
+  PS C:\> Get-vRNICheckPointManagers CP01
+  Get only the CheckPoint Firewall Managers called 'CP01'
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "firewall-managers" -Name $Name -Limit $Limit
   $results
 }
 
