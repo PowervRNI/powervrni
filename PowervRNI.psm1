@@ -1,4 +1,4 @@
-# vRealize Network Insight PowerShell module
+# VMware vRealize Network Insight PowerShell module
 # Martijn Smit (@smitmartijn)
 # msmit@vmware.com
 # Version 1.4
@@ -2832,7 +2832,84 @@ function Get-vRNIRecommendedRulesNsxBundle
   Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/micro-seg/recommended-rules/nsx" -Body $requestBody -OutFile $OutFile
 }
 
+#####################################################################################################################
+#####################################################################################################################
+#########################################  Settings Management ######################################################
+#####################################################################################################################
+#####################################################################################################################
 
+
+function New-vRNISubnetMapping
+{
+  <#
+  .SYNOPSIS
+  Create a new IP Subnet to VLAN ID mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. When vRNI does not have full visibility on the physical
+  network and can't discover the mappings between VLANs and subnets,
+  you can use subnet mappings to manually determine which subnets belong
+  to which VLANs.
+
+  .EXAMPLE
+  PS C:\> New-vRNISubnetMapping -VLANID 10 -CIDR 192.168.0.0/24
+
+  .EXAMPLE
+  PS C:\> New-vRNISubnetMapping -VLANID 11 -CIDR 192.168.0.0/16
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      # The VLAN ID for this mapping
+      [int]$VLANID,
+    [Parameter (Mandatory=$true)]
+      # The CIDR mapped to the given VLAN ID
+      [string]$CIDR,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = @{
+    "cidr" = $CIDR
+    "vlan_id" = $VLANID
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/subnet-mappings" -Body $requestBody
+}
+
+function Get-vRNISubnetMapping
+{
+  <#
+  .SYNOPSIS
+  Retrieve all IP Subnet to VLAN ID mappings within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. When vRNI does not have full visibility on the physical
+  network and can't discover the mappings between VLANs and subnets,
+  you can use subnet mappings to manually determine which subnets belong
+  to which VLANs.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISubnetMapping
+
+  #>
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri "/api/ni/settings/subnet-mappings"
+  return $results.results
+}
 
 # Call Init function
 _PvRNI_init
