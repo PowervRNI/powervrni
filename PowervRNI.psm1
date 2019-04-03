@@ -2911,5 +2911,298 @@ function Get-vRNISubnetMapping
   return $results.results
 }
 
+
+function Get-vRNIEastWestIP
+{
+  <#
+  .SYNOPSIS
+  Retrieve all East-West IP mappings within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using public IPs for workloads inside
+  the datacenter, you should add them to the East-West IP mappings.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIEastWestIP
+
+  #>
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri "/api/ni/settings/ip-tags/EAST_WEST"
+  return $results
+}
+
+function Add-vRNIEastWestIP
+{
+  <#
+  .SYNOPSIS
+  Adds a new East-West IP mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using public IPs for workloads inside
+  the datacenter, you should add them to the East-West IP mappings.
+
+  .EXAMPLE
+  PS C:\> Add-vRNIEastWestIP -Subnet 80.182.12.0/24
+
+  .EXAMPLE
+  PS C:\> Add-vRNIEastWestIP -IP_Range_Start 90.23.12.1 -IP_Range_End 90.23.12.100
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
+      # The subnet to add to the IP mappings
+      [string]$Subnet,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range start to add to the IP mappings
+      [string]$IP_Range_Start,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range end to add to the IP mappings
+      [string]$IP_Range_End,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = ""
+  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
+  {
+    $requestFormat = @{
+      "tag_id" = "EAST_WEST"
+      "subnets" = @($Subnet)
+    }
+  }
+  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
+  {
+    $requestFormat = @{
+      "tag_id" = "EAST_WEST"
+      "ip_address_ranges" = @( @{
+        "start_ip" = $IP_Range_Start
+        "end_ip" = $IP_Range_End
+      } )
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/ip-tags/EAST_WEST/add" -Body $requestBody
+  return $results
+}
+
+function Remove-vRNIEastWestIP
+{
+  <#
+  .SYNOPSIS
+  Removes a East-West IP mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using public IPs for workloads inside
+  the datacenter, you should add them to the East-West IP mappings.
+
+  .EXAMPLE
+  PS C:\> Remove-vRNIEastWestIP -Subnet 80.182.12.0/24
+
+  .EXAMPLE
+  PS C:\> Remove-vRNIEastWestIP -IP_Range_Start 90.23.12.1 -IP_Range_End 90.23.12.100
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
+      # The subnet to remove from the IP mappings
+      [string]$Subnet,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range start to remove from the IP mappings
+      [string]$IP_Range_Start,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range end to remove from the IP mappings
+      [string]$IP_Range_End,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = ""
+  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
+  {
+    $requestFormat = @{
+      "tag_id" = "EAST_WEST"
+      "subnets" = @($Subnet)
+    }
+  }
+  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
+  {
+    $requestFormat = @{
+      "tag_id" = "EAST_WEST"
+      "ip_address_ranges" = @( @{
+        "start_ip" = $IP_Range_Start
+        "end_ip" = $IP_Range_End
+      } )
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/ip-tags/EAST_WEST/remove" -Body $requestBody
+  return $results
+}
+
+function Get-vRNINorthSouthIP
+{
+  <#
+  .SYNOPSIS
+  Retrieve all North-South IP mappings within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using internal IPs outside the datacenter,
+  you should add them to the North-South IP mappings.
+
+  .EXAMPLE
+  PS C:\> Get-vRNINorthSouthIP
+
+  #>
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri "/api/ni/settings/ip-tags/INTERNET"
+  return $results
+}
+
+function Add-vRNINorthSouthIP
+{
+  <#
+  .SYNOPSIS
+  Add a new North-South IP mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using internal IPs outside the datacenter,
+  you should add them to the North-South IP mappings.
+
+  .EXAMPLE
+  PS C:\> Add-vRNINorthSouthIP -Subnet 80.182.12.0/24
+
+  .EXAMPLE
+  PS C:\> Add-vRNINorthSouthIP -IP_Range_Start 90.23.12.1 -IP_Range_End 90.23.12.100
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
+      # The subnet to add to the IP mappings
+      [string]$Subnet,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range start to add to the IP mappings
+      [string]$IP_Range_Start,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range end to add to the IP mappings
+      [string]$IP_Range_End,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = ""
+  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
+  {
+    $requestFormat = @{
+      "tag_id" = "INTERNET"
+      "subnets" = @($Subnet)
+    }
+  }
+  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
+  {
+    $requestFormat = @{
+      "tag_id" = "INTERNET"
+      "ip_address_ranges" = @( @{
+        "start_ip" = $IP_Range_Start
+        "end_ip" = $IP_Range_End
+      } )
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/ip-tags/INTERNET/add" -Body $requestBody
+  return $results
+}
+
+function Remove-vRNINorthSouthIP
+{
+  <#
+  .SYNOPSIS
+  Remove a North-South IP mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using internal IPs outside the datacenter,
+  you should add them to the North-South IP mappings.
+
+  .EXAMPLE
+  PS C:\> Remove-vRNINorthSouthIP -Subnet 80.182.12.0/24
+
+  .EXAMPLE
+  PS C:\> Remove-vRNINorthSouthIP -IP_Range_Start 90.23.12.1 -IP_Range_End 90.23.12.100
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
+      # The subnet to remove from the IP mappings
+      [string]$Subnet,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range start to remove from the IP mappings
+      [string]$IP_Range_Start,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range end to remove from the IP mappings
+      [string]$IP_Range_End,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = ""
+  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
+  {
+    $requestFormat = @{
+      "tag_id" = "INTERNET"
+      "subnets" = @($Subnet)
+    }
+  }
+  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
+  {
+    $requestFormat = @{
+      "tag_id" = "INTERNET"
+      "ip_address_ranges" = @( @{
+        "start_ip" = $IP_Range_Start
+        "end_ip" = $IP_Range_End
+      } )
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/ip-tags/INTERNET/remove" -Body $requestBody
+  return $results
+}
+
 # Call Init function
 _PvRNI_init
