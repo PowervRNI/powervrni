@@ -3332,5 +3332,111 @@ function Remove-vRNINorthSouthIP
   return $results
 }
 
+
+function Get-vRNIAuditLogs
+{
+  <#
+  .SYNOPSIS
+  Retrieve audit logs from Network Insight
+
+  .DESCRIPTION
+  Network Insight logs the actions that are being executed on its interface,
+  and this endpoint is a way to retrieve the audit log
+
+
+  .EXAMPLE
+  PS C:\> Get-vRNIAuditLogs
+
+  .EXAMPLE
+  PS C:\> Get-vRNIAuditLogs -Username "admin@local"
+
+  .EXAMPLE
+  PS C:\> Get-vRNIAuditLogs -Operation "LOGIN"
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Filter on username
+      [string]$Username = "",
+    [Parameter (Mandatory=$false)]
+      # Filter on a specific operation (like LOGIN, UPDATE)
+      [string]$Operation = "",
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to start looking up records
+      [int]$StartTime = 0,
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to stop looking up records
+      [int]$EndTime = 0,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # A list to collect the log records in
+  $logs = [System.Collections.ArrayList]@()
+
+  # Initialise the body
+  $body = @{
+    size =  50
+  }
+
+  # Filter on specific details, if given via params
+  if($Username -ne "") {
+    $body['username'] = $Username
+  }
+  if($Operation -ne "") {
+    $body['operation'] = $Operation
+  }
+
+  # Add a time range, if specified in the params
+  if($PSCmdlet.ParameterSetName -eq "TIMELIMIT" -And ($StartTime -gt 0 -And $EndTime -gt 0)) {
+    $body['time_range'] = @{
+      start_time = $StartTime
+      end_time = $EndTime
+    }
+  }
+
+  # Initialise the
+  $listParams = @{
+    Connection = $Connection
+    Method = 'POST'
+    Uri = "/api/ni/logs/audit"
+    Body = $body | ConvertTo-Json
+  }
+
+  # Loop through the log pages, as it uses pagination to return only a restrict set
+  $hasMoreData = $true
+  $counter = 0
+  while ($hasMoreData)
+  {
+    $logsResponse = Invoke-vRNIRestMethod @listParams
+
+    Write-Verbose ("$($logsResponse.total_count) logs to process")
+    if ($logsResponse.total_count -gt $size) {
+      $body['cursor'] = $logsResponse.cursor
+      $listParams['Body'] = $body | ConvertTo-Json
+    }
+
+    # Save results
+    foreach($log_record in $logsResponse.results)
+    {
+      $logs.Add($log_record) | Out-Null
+      $counter++
+    }
+
+    $remaining = $logsResponse.total_count - $counter
+    if ($remaining -gt 0) {
+      Write-Verbose "$remaining more logs to process"
+      $hasMoreData = $true
+    }
+    else {
+      $hasMoreData = $false
+    }
+  }
+
+  $logs
+}
+
 # Call Init function
 _PvRNI_init
