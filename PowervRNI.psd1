@@ -12,7 +12,7 @@
 RootModule = 'PowervRNI.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.4.74'
+ModuleVersion = '1.5.74'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -27,7 +27,7 @@ Author = 'Martijn Smit'
 CompanyName = 'VMware'
 
 # Copyright statement for this module
-Copyright = 'Copyright 2018 VMware. All rights reserved.'
+Copyright = 'Copyright 2019 VMware. All rights reserved.'
 
 # Description of the functionality provided by this module
 Description = 'A PowerShell module to talk to the vRealize Network Insight API'
@@ -69,24 +69,27 @@ DotNetFrameworkVersion = '4.0'
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = 'Connect-vRNIServer', 'Connect-NIServer', 'Disable-vRNIDataSource', 
-               'Disconnect-vRNIServer', 'Enable-vRNIDataSource', 
-               'Get-vRNIAPIVersion', 'Get-vRNIApplication', 
-               'Get-vRNIApplicationTier', 'Get-vRNIDataSource', 'Get-vRNIDatastore', 
-               'Get-vRNIDistributedSwitch', 'Get-vRNIDistributedSwitchPortGroup', 
-               'Get-vRNIEntity', 'Get-vRNIEntityName', 'Get-vRNIFirewallRule', 
-               'Get-vRNIFlow', 'Get-vRNIHost', 'Get-vRNIHostVMKNic', 'Get-vRNIIPSet', 
-               'Get-vRNIL2Network', 'Get-vRNINodes', 'Get-vRNINSXManager', 
-               'Get-vRNIProblem', 'Get-vRNIRecommendedRules', 
-               'Get-vRNIRecommendedRulesNsxBundle', 'Get-vRNISecurityGroup', 
-               'Get-vRNISecurityTag', 'Get-vRNIService', 'Get-vRNIServiceGroup', 
-               'Get-vRNIvCenter', 'Get-vRNIvCenterCluster', 
-               'Get-vRNIvCenterDatacenter', 'Get-vRNIvCenterFolder', 'Get-vRNIVM', 
-               'Get-vRNIVMvNIC', 'Get-vRNIDataSourceSNMPConfig', 
-               'Invoke-vRNIRestMethod', 'New-vRNIApplication', 
-               'New-vRNIApplicationTier', 'New-vRNIDataSource', 
-               'Remove-vRNIApplication', 'Remove-vRNIApplicationTier', 
-               'Remove-vRNIDataSource', 'Set-vRNIDataSourceSNMPConfig'
+FunctionsToExport = 'Connect-vRNIServer', 'Connect-NIServer', 'Disable-vRNIDataSource',
+               'Disconnect-vRNIServer', 'Enable-vRNIDataSource',
+               'Get-vRNIAPIVersion', 'Get-vRNIApplication',
+               'Get-vRNIApplicationTier', 'Get-vRNIDataSource', 'Get-vRNIDatastore',
+               'Get-vRNIDistributedSwitch', 'Get-vRNIDistributedSwitchPortGroup',
+               'Get-vRNIEntity', 'Get-vRNIEntityName', 'Get-vRNIFirewallRule',
+               'Get-vRNIFlow', 'Get-vRNIHost', 'Get-vRNIHostVMKNic', 'Get-vRNIIPSet',
+               'Get-vRNIL2Network', 'Get-vRNINodes', 'Get-vRNINSXManager',
+               'Get-vRNIProblem', 'Get-vRNIRecommendedRules',
+               'Get-vRNIRecommendedRulesNsxBundle', 'Get-vRNISecurityGroup',
+               'Get-vRNISecurityTag', 'Get-vRNIService', 'Get-vRNIServiceGroup',
+               'Get-vRNIvCenter', 'Get-vRNIvCenterCluster',
+               'Get-vRNIvCenterDatacenter', 'Get-vRNIvCenterFolder', 'Get-vRNIVM',
+               'Get-vRNIVMvNIC', 'Get-vRNIDataSourceSNMPConfig',
+               'Invoke-vRNIRestMethod', 'New-vRNIApplication',
+               'New-vRNIApplicationTier', 'New-vRNIDataSource',
+               'Remove-vRNIApplication', 'Remove-vRNIApplicationTier',
+               'Remove-vRNIDataSource', 'Set-vRNIDataSourceSNMPConfig',
+               'New-vRNISubnetMapping', 'Get-vRNISubnetMapping', 'Get-vRNIEastWestIP',
+               'Add-vRNIEastWestIP', 'Remove-vRNIEastWestIP', 'Get-vRNINorthSouthIP',
+               'Add-vRNINorthSouthIP', 'Remove-vRNINorthSouthIP'
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = '*'

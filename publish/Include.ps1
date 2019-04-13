@@ -7,7 +7,7 @@
 
 # This is the version of PowervRNI. The publish script will also append ".build number",
 # put this in a "major.minor" format
-$PowervRNI_Version = "1.4"
+$PowervRNI_Version = "1.5"
 
 $FunctionsToExport = @(
     'Connect-vRNIServer',
@@ -53,7 +53,16 @@ $FunctionsToExport = @(
     'Remove-vRNIApplication',
     'Remove-vRNIApplicationTier',
     'Remove-vRNIDataSource',
-    'Set-vRNIDataSourceSNMPConfig'
+    'Set-vRNIDataSourceSNMPConfig',
+    'New-vRNISubnetMapping',
+    'Get-vRNISubnetMapping',
+    'Get-vRNIEastWestIP',
+    'Add-vRNIEastWestIP',
+    'Remove-vRNIEastWestIP',
+    'Get-vRNINorthSouthIP',
+    'Add-vRNINorthSouthIP',
+    'Remove-vRNINorthSouthIP'
+    
 )
 
 # Manifest settings
@@ -62,7 +71,7 @@ $Manifest_Common = @{
     GUID = 'a34be6be-3dc1-457a-aea3-d4263481ed79'
     Author = 'Martijn Smit'
     CompanyName = 'VMware'
-    Copyright = 'Copyright 2018 VMware. All rights reserved.'
+    Copyright = 'Copyright 2019 VMware. All rights reserved.'
     Description = 'A PowerShell module to talk to the vRealize Network Insight API'
     DotNetFrameworkVersion = '4.0'
     FunctionsToExport = $FunctionsToExport

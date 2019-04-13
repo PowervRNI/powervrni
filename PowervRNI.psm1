@@ -1,7 +1,7 @@
-# vRealize Network Insight PowerShell module
+# VMware vRealize Network Insight PowerShell module
 # Martijn Smit (@smitmartijn)
 # msmit@vmware.com
-# Version 1.4
+# Version 1.5
 
 
 # Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource
@@ -19,7 +19,9 @@ $Script:DatasourceURLs.Add("hponeview", @("/data-sources/hpov-managers"))
 $Script:DatasourceURLs.Add("hpvcmanager", @("/data-sources/hpvc-managers"))
 $Script:DatasourceURLs.Add("checkpointfirewall", @("/data-sources/checkpoint-firewalls"))
 $Script:DatasourceURLs.Add("panfirewall", @("/data-sources/panorama-firewalls"))
-$Script:DatasourceURLs.Add("all", @("/data-sources/vcenters", "/data-sources/nsxv-managers", "/data-sources/cisco-switches", "/data-sources/arista-switches", "/data-sources/dell-switches", "/data-sources/brocade-switches", "/data-sources/juniper-switches", "/data-sources/ucs-managers", "/data-sources/hpov-managers", "/data-sources/hpvc-managers", "/data-sources/checkpoint-firewalls", "/data-sources/panorama-firewalls"))
+$Script:DatasourceURLs.Add("infoblox", @("/data-sources/infoblox-managers"))
+$Script:DatasourceURLs.Add("nsxpolicymanager", @("/data-sources/policy-managers"))
+$Script:DatasourceURLs.Add("all", @("/data-sources/vcenters", "/data-sources/nsxv-managers", "/data-sources/cisco-switches", "/data-sources/arista-switches", "/data-sources/dell-switches", "/data-sources/brocade-switches", "/data-sources/juniper-switches", "/data-sources/ucs-managers", "/data-sources/hpov-managers", "/data-sources/hpvc-managers", "/data-sources/checkpoint-firewalls", "/data-sources/panorama-firewalls", "/data-sources/infoblox-managers", "/data-sources/policy-managers"))
 
 # Keep another list handy which translates the internal vRNI Names for datasources to their relative URLs
 $Script:DatasourceInternalURLs = @{}
@@ -36,6 +38,8 @@ $Script:DatasourceInternalURLs.Add("HPOneViewManagerDataSource", "/data-sources/
 $Script:DatasourceInternalURLs.Add("HPVCManagerDataSource", "/data-sources/hpvc-managers")
 $Script:DatasourceInternalURLs.Add("CheckpointFirewallDataSource", "/data-sources/checkpoint-firewalls")
 $Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panorama-firewalls")
+$Script:DatasourceInternalURLs.Add("InfobloxManagerDataSource", "/data-sources/infoblox-managers")
+$Script:DatasourceInternalURLs.Add("PolicyManagerDataSource", "/data-sources/policy-managers")
 
 # This list will be used in Get-vRNIEntity to map entity URLs to their IDs so we can use those IDs in /entities/fetch
 $Script:EntityURLtoIdMapping = @{}
@@ -60,6 +64,7 @@ $Script:EntityURLtoIdMapping.Add("vcenter-managers", "VCenterManager")
 $Script:EntityURLtoIdMapping.Add("nsx-managers", "NSXVManager")
 $Script:EntityURLtoIdMapping.Add("distributed-virtual-switches", "DistributedVirtualSwitch")
 $Script:EntityURLtoIdMapping.Add("distributed-virtual-portgroups", "DistributedVirtualPortgroup")
+$Script:EntityURLtoIdMapping.Add("firewall-managers", "CheckpointManager")
 
 # Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing some of the base functions &
 # principles on which this module is built on.
@@ -729,7 +734,7 @@ function New-vRNIDataSource
   param (
     [Parameter (Mandatory=$true)]
       # Which datasource type to create - TODO: make this a dynamic param to get the values from $Script:data
-      [ValidateSet ("vcenter", "nsxv", "nsxt", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall")]
+      [ValidateSet ("vcenter", "nsxv", "nsxt", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall", "infoblox", "nsxpolicymanager")]
       [string]$DataSourceType,
     [Parameter (Mandatory=$true)]
       # Username to use to login to the datasource
@@ -2584,6 +2589,42 @@ function Get-vRNIDistributedSwitchPortGroup
   $results
 }
 
+function Get-vRNICheckPointManagers
+{
+  <#
+  .SYNOPSIS
+  Get available CheckPoint Firewall Managers from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all CheckPoint Firewall Managers in your environment
+  and this cmdlet will help you discover these managers.
+
+  .EXAMPLE
+  PS C:\> Get-vRNICheckPointManagers
+  Get all CheckPoint Firewall Managers in the vRNI environment.
+
+  .EXAMPLE
+  PS C:\> Get-vRNICheckPointManagers CP01
+  Get only the CheckPoint Firewall Managers called 'CP01'
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "firewall-managers" -Name $Name -Limit $Limit
+  $results
+}
+
 #----------------------------------------------------------------------------------------------------------------#
 #----------------------------------------------------------------------------------------------------------------#
 #----------------------------------------- Storage Entities -----------------------------------------------------#
@@ -2791,7 +2832,376 @@ function Get-vRNIRecommendedRulesNsxBundle
   Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/micro-seg/recommended-rules/nsx" -Body $requestBody -OutFile $OutFile
 }
 
+#####################################################################################################################
+#####################################################################################################################
+#########################################  Settings Management ######################################################
+#####################################################################################################################
+#####################################################################################################################
 
+
+function New-vRNISubnetMapping
+{
+  <#
+  .SYNOPSIS
+  Create a new IP Subnet to VLAN ID mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. When vRNI does not have full visibility on the physical
+  network and can't discover the mappings between VLANs and subnets,
+  you can use subnet mappings to manually determine which subnets belong
+  to which VLANs.
+
+  .EXAMPLE
+  PS C:\> New-vRNISubnetMapping -VLANID 10 -CIDR 192.168.0.0/24
+
+  .EXAMPLE
+  PS C:\> New-vRNISubnetMapping -VLANID 11 -CIDR 192.168.0.0/16
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      # The VLAN ID for this mapping
+      [int]$VLANID,
+    [Parameter (Mandatory=$true)]
+      # The CIDR mapped to the given VLAN ID
+      [string]$CIDR,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = @{
+    "cidr" = $CIDR
+    "vlan_id" = $VLANID
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/subnet-mappings" -Body $requestBody
+}
+
+function Get-vRNISubnetMapping
+{
+  <#
+  .SYNOPSIS
+  Retrieve all IP Subnet to VLAN ID mappings within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. When vRNI does not have full visibility on the physical
+  network and can't discover the mappings between VLANs and subnets,
+  you can use subnet mappings to manually determine which subnets belong
+  to which VLANs.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISubnetMapping
+
+  #>
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri "/api/ni/settings/subnet-mappings"
+  return $results.results
+}
+
+function Get-vRNIEastWestIP
+{
+  <#
+  .SYNOPSIS
+  Retrieve all East-West IP mappings within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using public IPs for workloads inside
+  the datacenter, you should add them to the East-West IP mappings.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIEastWestIP
+
+  #>
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri "/api/ni/settings/ip-tags/EAST_WEST"
+  return $results
+}
+
+function Add-vRNIEastWestIP
+{
+  <#
+  .SYNOPSIS
+  Adds a new East-West IP mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using public IPs for workloads inside
+  the datacenter, you should add them to the East-West IP mappings.
+
+  .EXAMPLE
+  PS C:\> Add-vRNIEastWestIP -Subnet 80.182.12.0/24
+
+  .EXAMPLE
+  PS C:\> Add-vRNIEastWestIP -IP_Range_Start 90.23.12.1 -IP_Range_End 90.23.12.100
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
+      # The subnet to add to the IP mappings
+      [string]$Subnet,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range start to add to the IP mappings
+      [string]$IP_Range_Start,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range end to add to the IP mappings
+      [string]$IP_Range_End,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = ""
+  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
+  {
+    $requestFormat = @{
+      "tag_id" = "EAST_WEST"
+      "subnets" = @($Subnet)
+    }
+  }
+  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
+  {
+    $requestFormat = @{
+      "tag_id" = "EAST_WEST"
+      "ip_address_ranges" = @( @{
+        "start_ip" = $IP_Range_Start
+        "end_ip" = $IP_Range_End
+      } )
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/ip-tags/EAST_WEST/add" -Body $requestBody
+  return $results
+}
+
+function Remove-vRNIEastWestIP
+{
+  <#
+  .SYNOPSIS
+  Removes a East-West IP mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using public IPs for workloads inside
+  the datacenter, you should add them to the East-West IP mappings.
+
+  .EXAMPLE
+  PS C:\> Remove-vRNIEastWestIP -Subnet 80.182.12.0/24
+
+  .EXAMPLE
+  PS C:\> Remove-vRNIEastWestIP -IP_Range_Start 90.23.12.1 -IP_Range_End 90.23.12.100
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
+      # The subnet to remove from the IP mappings
+      [string]$Subnet,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range start to remove from the IP mappings
+      [string]$IP_Range_Start,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range end to remove from the IP mappings
+      [string]$IP_Range_End,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = ""
+  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
+  {
+    $requestFormat = @{
+      "tag_id" = "EAST_WEST"
+      "subnets" = @($Subnet)
+    }
+  }
+  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
+  {
+    $requestFormat = @{
+      "tag_id" = "EAST_WEST"
+      "ip_address_ranges" = @( @{
+        "start_ip" = $IP_Range_Start
+        "end_ip" = $IP_Range_End
+      } )
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/ip-tags/EAST_WEST/remove" -Body $requestBody
+  return $results
+}
+
+function Get-vRNINorthSouthIP
+{
+  <#
+  .SYNOPSIS
+  Retrieve all North-South IP mappings within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using internal IPs outside the datacenter,
+  you should add them to the North-South IP mappings.
+
+  .EXAMPLE
+  PS C:\> Get-vRNINorthSouthIP
+
+  #>
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri "/api/ni/settings/ip-tags/INTERNET"
+  return $results
+}
+
+function Add-vRNINorthSouthIP
+{
+  <#
+  .SYNOPSIS
+  Add a new North-South IP mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using internal IPs outside the datacenter,
+  you should add them to the North-South IP mappings.
+
+  .EXAMPLE
+  PS C:\> Add-vRNINorthSouthIP -Subnet 80.182.12.0/24
+
+  .EXAMPLE
+  PS C:\> Add-vRNINorthSouthIP -IP_Range_Start 90.23.12.1 -IP_Range_End 90.23.12.100
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
+      # The subnet to add to the IP mappings
+      [string]$Subnet,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range start to add to the IP mappings
+      [string]$IP_Range_Start,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range end to add to the IP mappings
+      [string]$IP_Range_End,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = ""
+  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
+  {
+    $requestFormat = @{
+      "tag_id" = "INTERNET"
+      "subnets" = @($Subnet)
+    }
+  }
+  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
+  {
+    $requestFormat = @{
+      "tag_id" = "INTERNET"
+      "ip_address_ranges" = @( @{
+        "start_ip" = $IP_Range_Start
+        "end_ip" = $IP_Range_End
+      } )
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/ip-tags/INTERNET/add" -Body $requestBody
+  return $results
+}
+
+function Remove-vRNINorthSouthIP
+{
+  <#
+  .SYNOPSIS
+  Remove a North-South IP mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using internal IPs outside the datacenter,
+  you should add them to the North-South IP mappings.
+
+  .EXAMPLE
+  PS C:\> Remove-vRNINorthSouthIP -Subnet 80.182.12.0/24
+
+  .EXAMPLE
+  PS C:\> Remove-vRNINorthSouthIP -IP_Range_Start 90.23.12.1 -IP_Range_End 90.23.12.100
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
+      # The subnet to remove from the IP mappings
+      [string]$Subnet,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range start to remove from the IP mappings
+      [string]$IP_Range_Start,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range end to remove from the IP mappings
+      [string]$IP_Range_End,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = ""
+  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
+  {
+    $requestFormat = @{
+      "tag_id" = "INTERNET"
+      "subnets" = @($Subnet)
+    }
+  }
+  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
+  {
+    $requestFormat = @{
+      "tag_id" = "INTERNET"
+      "ip_address_ranges" = @( @{
+        "start_ip" = $IP_Range_Start
+        "end_ip" = $IP_Range_End
+      } )
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/ip-tags/INTERNET/remove" -Body $requestBody
+  return $results
+}
 
 # Call Init function
 _PvRNI_init
