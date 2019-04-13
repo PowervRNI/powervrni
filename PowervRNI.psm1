@@ -21,7 +21,20 @@ $Script:DatasourceURLs.Add("checkpointfirewall", @("/data-sources/checkpoint-fir
 $Script:DatasourceURLs.Add("panfirewall", @("/data-sources/panorama-firewalls"))
 $Script:DatasourceURLs.Add("infoblox", @("/data-sources/infoblox-managers"))
 $Script:DatasourceURLs.Add("nsxpolicymanager", @("/data-sources/policy-managers"))
-$Script:DatasourceURLs.Add("all", @("/data-sources/vcenters", "/data-sources/nsxv-managers", "/data-sources/cisco-switches", "/data-sources/arista-switches", "/data-sources/dell-switches", "/data-sources/brocade-switches", "/data-sources/juniper-switches", "/data-sources/ucs-managers", "/data-sources/hpov-managers", "/data-sources/hpvc-managers", "/data-sources/checkpoint-firewalls", "/data-sources/panorama-firewalls", "/data-sources/infoblox-managers", "/data-sources/policy-managers"))
+
+$Script:DatasourceURLs.Add("f5-bigip", @("/data-sources/f5-bigip"))
+$Script:DatasourceURLs.Add("huawei", @("/data-sources/huawei"))
+$Script:DatasourceURLs.Add("ciscoaci", @("/data-sources/cisco-aci"))
+$Script:DatasourceURLs.Add("pks", @("/data-sources/pks"))
+$Script:DatasourceURLs.Add("kubernetes", @("/data-sources/kubernetes-clusters"))
+$Script:DatasourceURLs.Add("servicenow", @("/data-sources/servicenow-instances"))
+
+# Collect a list of all data source URLs to be used to retrieve "all" data sources
+$allURLs = New-Object System.Collections.Generic.List[System.Object]
+foreach ($h in $Script:DatasourceURLs.GetEnumerator()) {
+  $allURLs += $h.Value
+}
+$Script:DatasourceURLs.Add("all", $allURLs)
 
 # Keep another list handy which translates the internal vRNI Names for datasources to their relative URLs
 $Script:DatasourceInternalURLs = @{}
@@ -40,6 +53,12 @@ $Script:DatasourceInternalURLs.Add("CheckpointFirewallDataSource", "/data-source
 $Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panorama-firewalls")
 $Script:DatasourceInternalURLs.Add("InfobloxManagerDataSource", "/data-sources/infoblox-managers")
 $Script:DatasourceInternalURLs.Add("PolicyManagerDataSource", "/data-sources/policy-managers")
+$Script:DatasourceInternalURLs.Add("GDDataSource", "/data-sources/f5-bigip")
+#$Script:DatasourceInternalURLs.Add("GDDataSource", "/data-sources/huawei")
+$Script:DatasourceInternalURLs.Add("CiscoACIDataSource", "/data-sources/cisco-aci")
+$Script:DatasourceInternalURLs.Add("PKSDataSource", "/data-sources/pks")
+$Script:DatasourceInternalURLs.Add("KubernetesDataSource", "/data-sources/kubernetes-clusters")
+$Script:DatasourceInternalURLs.Add("ServiceNowDataSource", "/data-sources/servicenow-instances")
 
 # This list will be used in Get-vRNIEntity to map entity URLs to their IDs so we can use those IDs in /entities/fetch
 $Script:EntityURLtoIdMapping = @{}
@@ -664,42 +683,79 @@ function Get-vRNIDataSource
   Retrieves the defaults of all NSX Managers added to vRNI as a datasource.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Which datasource type to get - TODO: make this a dynamic param to get the values from $Script:data
-      [ValidateSet ("vcenter", "nsxv", "nsxt", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall", "all")]
-      [string]$DataSourceType="all",
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
       [ValidateNotNullOrEmpty()]
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  # Use this as a return container
-  $datasources = [System.Collections.ArrayList]@()
-
-  # Because each datasource type has its unique URL (/api/ni/data-sources/vcenter, /data-sources/ucs-manager, etc),
-  # and we want all the datasource information, loop through the URLs of the types we want to retrieve and
-  $datasource_types_to_get = $Script:DatasourceURLs.$DataSourceType
-  foreach($datasource_uri in $datasource_types_to_get)
+  DynamicParam
   {
-    # Energize!
-    $response = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)"
+    # Use a dynamic parameter to get a list of all data source names from $Script:DatasourceURLs
+    $ParameterName = 'DataSourceType'
 
-    # Process results, if there are datasources of this type. The results of the /api/ni/data-sources/$TYPE call is a
-    # list of datasource IDs and not much more. We take that ID and do a call for details on that datasource
-    if($response.results -ne "")
+    # Form attribute parameters
+    $RuntimeParameterDictionary = New-Object System.Management.Automation.RuntimeDefinedParameterDictionary
+    $AttributeCollection = New-Object System.Collections.ObjectModel.Collection[System.Attribute]
+
+    # Create and set the parameters' attributes
+    $ParameterAttribute = New-Object System.Management.Automation.ParameterAttribute
+    $ParameterAttribute.Mandatory = $false
+    $AttributeCollection.Add($ParameterAttribute)
+
+    # Generate and set the ValidateSet
+    # Collect a list of all data source names
+    $allDS = New-Object System.Collections.Generic.List[System.Object]
+    foreach ($h in $Script:DatasourceURLs.GetEnumerator()) {
+      $allDS += $h.Name
+    }
+
+    $ValidateSetAttribute = New-Object System.Management.Automation.ValidateSetAttribute($allDS)
+
+    # Add the ValidateSet to the attributes collection
+    $AttributeCollection.Add($ValidateSetAttribute)
+
+    # Create and return the dynamic parameter
+    $RuntimeParameter = New-Object System.Management.Automation.RuntimeDefinedParameter($ParameterName, [string], $AttributeCollection)
+    $RuntimeParameterDictionary.Add($ParameterName, $RuntimeParameter)
+    return $RuntimeParameterDictionary
+  }
+  Process
+  {
+    # Bind the parameter to a friendly variable
+    New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
+
+    if(!$DataSourceType) {
+      $DataSourceType = "all"
+    }
+
+    # Use this as a return container
+    $datasources = [System.Collections.ArrayList]@()
+
+    # Because each datasource type has its unique URL (/api/ni/data-sources/vcenter, /data-sources/ucs-manager, etc),
+    # and we want all the datasource information, loop through the URLs of the types we want to retrieve and
+    $datasource_types_to_get = $Script:DatasourceURLs.$DataSourceType
+    foreach($datasource_uri in $datasource_types_to_get)
     {
-      foreach ($datasource in $response.results)
+      # Energize!
+      $response = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)"
+
+      # Process results, if there are datasources of this type. The results of the /api/ni/data-sources/$TYPE call is a
+      # list of datasource IDs and not much more. We take that ID and do a call for details on that datasource
+      if($response.results -ne "")
       {
-        # Retrieve datasource details and store it
-        $datasource_detail = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)/$($datasource.entity_id)"
-        $datasources.Add($datasource_detail) | Out-Null
+        foreach ($datasource in $response.results)
+        {
+          # Retrieve datasource details and store it
+          $datasource_detail = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)/$($datasource.entity_id)"
+          $datasources.Add($datasource_detail) | Out-Null
+        }
       }
     }
-  }
 
-  # Return all found data sources
-  $datasources
+    # Return all found data sources
+    $datasources
+  }
 }
 
 function New-vRNIDataSource
@@ -732,10 +788,6 @@ function New-vRNIDataSource
   [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
 
   param (
-    [Parameter (Mandatory=$true)]
-      # Which datasource type to create - TODO: make this a dynamic param to get the values from $Script:data
-      [ValidateSet ("vcenter", "nsxv", "nsxt", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall", "infoblox", "nsxpolicymanager")]
-      [string]$DataSourceType,
     [Parameter (Mandatory=$true)]
       # Username to use to login to the datasource
       [ValidateNotNullOrEmpty()]
@@ -806,59 +858,95 @@ function New-vRNIDataSource
       [ValidateNotNullOrEmpty()]
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
+  DynamicParam
+  {
+    # Use a dynamic parameter to get a list of all data source names from $Script:DatasourceURLs
+    $ParameterName = 'DataSourceType'
 
-  if($IP -ne "" -And $FDQN -ne "") {
-    throw "Please only provide the FDQN or the IP address for the datasource, not both."
-  }
+    # Form attribute parameters
+    $RuntimeParameterDictionary = New-Object System.Management.Automation.RuntimeDefinedParameterDictionary
+    $AttributeCollection = New-Object System.Collections.ObjectModel.Collection[System.Attribute]
 
-  # Check if the NSXDS parameter set is used when adding a NSX Manager as datasource
-  if($DataSourceType -eq "nsxv" -And $PSCmdlet.ParameterSetName -ne "NSXDS") {
-    throw "Please provide the NSX parameters when adding a NSX Manager."
-  }
+    # Create and set the parameters' attributes
+    $ParameterAttribute = New-Object System.Management.Automation.ParameterAttribute
+    $ParameterAttribute.Mandatory = $true
+    $AttributeCollection.Add($ParameterAttribute)
 
-  # Check if the switch type is provided, when adding a Cisco of Dell switch
-  if($DataSourceType -eq "ciscoswitch" -And $PSCmdlet.ParameterSetName -ne "CISCOSWITCH") {
-    throw "Please provide the -CiscoSwitchType parameter when adding a Cisco switch."
-  }
-  if($DataSourceType -eq "dellswitch" -And $PSCmdlet.ParameterSetName -ne "DELLSWITCH") {
-    throw "Please provide the -DellSwitchType parameter when adding a Dell switch."
-  }
-
-  # Format request with all given data
-  $requestFormat = @{
-    "ip" = $IP
-    "fqdn" = $FDQN
-    "proxy_id" = $CollectorVMId
-    "nickname" = $Nickname
-    "notes" = $Notes
-    "enabled" = $Enabled
-    "credentials" = @{
-      "username" = $Username
-      "password" = $Password
+    # Generate and set the ValidateSet
+    # Collect a list of all data source names
+    $allDS = New-Object System.Collections.Generic.List[System.Object]
+    foreach ($h in $Script:DatasourceURLs.GetEnumerator()) {
+      $allDS += $h.Name
     }
-  }
 
-  # If we're adding a NSX Manager, also add the NSX parameters to the body
-  if($PSCmdlet.ParameterSetName -eq "NSXDS") {
-    $requestFormat.vcenter_id = $NSXvCenterID
-    $requestFormat.ipfix_enabled = $NSXEnableIPFIX
-    $requestFormat.central_cli_enabled = $NSXEnableCentralCLI
-  }
+    $ValidateSetAttribute = New-Object System.Management.Automation.ValidateSetAttribute($allDS)
 
-  # When adding a Cisco or Dell switch, provide the switch_type key in the body
-  if($DataSourceType -eq "ciscoswitch") {
-    $requestFormat.switch_type = $CiscoSwitchType
-  }
-  if($DataSourceType -eq "dellswitch") {
-    $requestFormat.switch_type = $DellSwitchType
-  }
+    # Add the ValidateSet to the attributes collection
+    $AttributeCollection.Add($ValidateSetAttribute)
 
-  # Convert the hash to JSON, form the URI and send the request to vRNI
-  $requestBody = ConvertTo-Json $requestFormat
-  $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])"
+    # Create and return the dynamic parameter
+    $RuntimeParameter = New-Object System.Management.Automation.RuntimeDefinedParameter($ParameterName, [string], $AttributeCollection)
+    $RuntimeParameterDictionary.Add($ParameterName, $RuntimeParameter)
+    return $RuntimeParameterDictionary
+  }
+  Process
+  {
+    # Bind the parameter to a friendly variable
+    New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
 
-  $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI -Body $requestBody
-  $response
+    if($IP -ne "" -And $FDQN -ne "") {
+      throw "Please only provide the FDQN or the IP address for the datasource, not both."
+    }
+
+    # Check if the NSXDS parameter set is used when adding a NSX Manager as datasource
+    if($DataSourceType -eq "nsxv" -And $PSCmdlet.ParameterSetName -ne "NSXDS") {
+      throw "Please provide the NSX parameters when adding a NSX Manager."
+    }
+
+    # Check if the switch type is provided, when adding a Cisco of Dell switch
+    if($DataSourceType -eq "ciscoswitch" -And $PSCmdlet.ParameterSetName -ne "CISCOSWITCH") {
+      throw "Please provide the -CiscoSwitchType parameter when adding a Cisco switch."
+    }
+    if($DataSourceType -eq "dellswitch" -And $PSCmdlet.ParameterSetName -ne "DELLSWITCH") {
+      throw "Please provide the -DellSwitchType parameter when adding a Dell switch."
+    }
+
+    # Format request with all given data
+    $requestFormat = @{
+      "ip" = $IP
+      "fqdn" = $FDQN
+      "proxy_id" = $CollectorVMId
+      "nickname" = $Nickname
+      "notes" = $Notes
+      "enabled" = $Enabled
+      "credentials" = @{
+        "username" = $Username
+        "password" = $Password
+      }
+    }
+
+    # If we're adding a NSX Manager, also add the NSX parameters to the body
+    if($PSCmdlet.ParameterSetName -eq "NSXDS") {
+      $requestFormat.vcenter_id = $NSXvCenterID
+      $requestFormat.ipfix_enabled = $NSXEnableIPFIX
+      $requestFormat.central_cli_enabled = $NSXEnableCentralCLI
+    }
+
+    # When adding a Cisco or Dell switch, provide the switch_type key in the body
+    if($DataSourceType -eq "ciscoswitch") {
+      $requestFormat.switch_type = $CiscoSwitchType
+    }
+    if($DataSourceType -eq "dellswitch") {
+      $requestFormat.switch_type = $DellSwitchType
+    }
+
+    # Convert the hash to JSON, form the URI and send the request to vRNI
+    $requestBody = ConvertTo-Json $requestFormat
+    $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])"
+
+    $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI -Body $requestBody
+    $response
+  }
 }
 
 function Remove-vRNIDataSource
