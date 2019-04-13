@@ -221,7 +221,7 @@ function Invoke-vRNIRestMethod
     $headerDict.add("Authorization", "NetworkInsight $authtoken")
   }
   # Add the Cloud Services Platform token if available (means we're using Network Insight as a Service)
-  if($null -ne $connection) 
+  if($null -ne $connection)
   {
     if($null -ne $connection.CSPToken) {
       $headerDict.remove("Authorization")
@@ -525,7 +525,7 @@ function Connect-NIServer
 {
   <#
   .SYNOPSIS
-  Connects to the Network Insight Service on the VMware Cloud Services 
+  Connects to the Network Insight Service on the VMware Cloud Services
   Platform and constructs a connection object.
 
   .DESCRIPTION
@@ -540,7 +540,7 @@ function Connect-NIServer
 
   .EXAMPLE
   PS C:\> Connect-NIServer -RefreshToken xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-  Connect to the VMware Cloud Services Portal with your specified Refresh Token. 
+  Connect to the VMware Cloud Services Portal with your specified Refresh Token.
   The cmdlet will connect to the CSP, validate the token and will return an
   access token. Returns the connection object, if successful.
   #>
@@ -1127,8 +1127,10 @@ function Get-vRNIDataSourceSNMPConfig
       # Sanity check on the data source type: only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP config
       if($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "BrocadeSwitchDataSource" -And $oThisDatasource.entity_type -ne "JuniperSwitchDataSource" -And
-        $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource") {
-        throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP configuration."
+        $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource" -And
+        $oThisDatasource.entity_type -ne "CiscoACIDataSource" -And $oThisDatasource.entity_type -ne "GDDataSource")
+      {
+        throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, Arista, F5, Huawei & UCS have SNMP configuration."
       }
 
       # All we have to do is to send a GET request to URI /api/ni/$DataSourceType/$DatasourceId/snmp-config
@@ -1389,6 +1391,45 @@ function Get-vRNIApplication
   }
 
   $applications
+}
+
+function Get-vRNIApplicationMemberVM
+{
+  <#
+  .SYNOPSIS
+  Get a list of VMs in an application from vRealize Network Insight.
+
+  .DESCRIPTION
+  Within vRNI there are applications, which can be viewed as groups of VMs.
+  These groups can be used to group the VMs of a certain application together,
+  and filter on searches within vRNI. For instance, you can generate recommended
+  firewall rules based on an application group.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIApplication My3TierApp | Get-vRNIApplicationMemberVM
+  Show the member VMs for the application called "My3TierApp"
+  #>
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true)]
+      # Application object, gotten from Get-vRNIApplication
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$Application,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process
+  {
+    ## do Foreach-Object, so as to enable user to pass multiple Application objects for value of -Application parameter
+    $Application | Foreach-Object {
+      $oThisApplication = $_
+      # Get a list of all VMs for this application
+      $vm_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($oThisApplication.entity_id)/members/vms"
+      $vm_list.results
+    } ## end Foreach-Object
+  } ## end process
 }
 
 function Get-vRNIApplicationTier
