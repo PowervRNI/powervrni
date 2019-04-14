@@ -3332,7 +3332,6 @@ function Remove-vRNINorthSouthIP
   return $results
 }
 
-
 function Get-vRNIAuditLogs
 {
   <#
@@ -3397,7 +3396,7 @@ function Get-vRNIAuditLogs
     }
   }
 
-  # Initialise the
+  # Initialise the RestMethod params
   $listParams = @{
     Connection = $Connection
     Method = 'POST'
@@ -3436,6 +3435,362 @@ function Get-vRNIAuditLogs
   }
 
   $logs
+}
+
+
+
+#####################################################################################################################
+#####################################################################################################################
+#######################################  vIDM Settings Management ###################################################
+#####################################################################################################################
+#####################################################################################################################
+
+function Get-vRNISettingsVIDM
+{
+  <#
+  .SYNOPSIS
+  Retrieve vIDM settings from Network Insight
+
+  .DESCRIPTION
+  VMware Identity Manager (vIDM) can be used for authentication within
+  vRNI. vIDM offers more authentication & authorization options like
+  multi-factor, location dependent, etc. This cmdlet retrieves the vIDM
+  settings.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISettingsVIDM
+
+  #>
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method "GET" -Uri "/api/ni/settings/vidm"
+  $result
+}
+
+function Set-vRNISettingsVIDM
+{
+  <#
+  .SYNOPSIS
+  Retrieve vIDM settings from Network Insight
+
+  .DESCRIPTION
+  VMware Identity Manager (vIDM) can be used for authentication within
+  vRNI. vIDM offers more authentication & authorization options like
+  multi-factor, location dependent, etc. This cmdlet configures the
+  vIDM settings.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISettingsVIDM -Appliance my-vidm-appliance -ClientID vRNI -ClientSecret longstring
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      # vIDM Appliance hostname
+      [string]$Appliance,
+    [Parameter (Mandatory=$true)]
+      # vIDM OAuth2 Client ID
+      [string]$ClientID,
+    [Parameter (Mandatory=$true)]
+      # vIDM OAuth2 Client Secret
+      [string]$ClientSecret,
+    [Parameter (Mandatory=$false)]
+      # Optional vIDM OAuth2 SHA Thumbprint
+      [string]$SHA_Thumbprint = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Initialise the body
+  $body = @{
+    vidm_appliance = $Appliance
+    client_id = $ClientID
+    client_secret = $ClientSecret
+    sha_thumbprint = $SHA_Thumbprint
+    enable = $true
+  }
+
+  # Initialise the RestMethod params
+  $listParams = @{
+    Connection = $Connection
+    Method = 'POST'
+    Uri = "/api/ni/settings/vidm"
+    Body = $body | ConvertTo-Json
+  }
+
+  $result = Invoke-vRNIRestMethod @listParams
+  $result
+}
+
+function Get-vRNISettingsUserGroup
+{
+  <#
+  .SYNOPSIS
+  Retrieve user groups settings from Network Insight
+
+  .DESCRIPTION
+  User groups from AD, VIDM or LOCAL can be mapped to vRNI
+  member roles (ADMIN or MEMBER) and this cmdlet gets the
+  current mappings.
+
+  The public API currently only supports the VIDM type.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISettingsUserGroups -Type VIDM
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      [ValidateSet ("LDAP", "LOCAL", "VIDM")]
+      # Group type; where is the group from?
+      [string]$Type,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method "GET" -Uri "/api/ni/settings/user-groups?type=$($Type)"
+  $result.results
+}
+
+function Set-vRNISettingsUserGroup
+{
+  <#
+  .SYNOPSIS
+  Configure user group role mappings.
+
+  .DESCRIPTION
+  User groups from AD, VIDM or LOCAL can be mapped to vRNI
+  member roles (ADMIN or MEMBER) and this cmdlet configures
+  a group to role mapping.
+
+  .EXAMPLE
+  PS C:\> Set-vRNISettingsVIDMUserGroup -Type VIDM -Group vrni-admins -Domain mylab.local -Role ADMIN
+  Map group 'vrni-admins' in vIDM to the vRNI ADMIN role
+
+  .EXAMPLE
+  PS C:\> Set-vRNISettingsVIDMUserGroup -Type VIDM -Group vrni-members -Domain mylab.local -Role MEMBER
+  Map group 'vrni-members' in vIDM to the vRNI MEMBER role
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      # Type user group (only VIDM supported for now)
+      [ValidateSet ("VIDM")]
+      [string]$Type,
+    [Parameter (Mandatory=$true)]
+      # Name of the group in vIDM
+      [string]$Group,
+    [Parameter (Mandatory=$true)]
+      # Domain in vIDM that this group belongs to
+      [string]$Domain,
+    [Parameter (Mandatory=$true)]
+      # Role that this group will get in vRNI
+      [ValidateSet ("ADMIN", "MEMBER")]
+      [string]$Role,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Initialise the body
+  $body = @{
+    group_name = $Group
+    domain = $Domain
+    role = $Role
+  }
+
+  # Initialise the RestMethod params
+  $listParams = @{
+    Connection = $Connection
+    Method = 'POST'
+    Uri = "/api/ni/settings/user-groups/vidm"
+    Body = $body | ConvertTo-Json
+  }
+
+  $result = Invoke-vRNIRestMethod @listParams
+  $result
+}
+
+function Remove-vRNISettingsUserGroup
+{
+  <#
+  .SYNOPSIS
+  Removes a user group mapping from vRealize Network Insight
+
+  .DESCRIPTION
+  User groups from AD, VIDM or LOCAL can be mapped to vRNI
+  member roles (ADMIN or MEMBER) and this cmdlet removes
+  a group to role mapping.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISettingsUserGroup | Where {$_.group_name -eq "mygroup"} | Remove-vRNISettingsUserGroup
+
+  #>
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNISettingsUserGroup
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$Group,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+    $Group | Foreach-Object {
+      $oThisGroup = $_
+      # All we have to do is to send a DELETE request to URI /api/ni/settings/user-groups/$groupId, so
+      # form the URI and send the DELETE request to vRNI
+      $URI = "/api/ni/settings/user-groups/$($oThisGroup.id)"
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri $URI
+    } ## end Foreach-Object
+  } ## end process
+}
+
+function Get-vRNISettingsUser
+{
+  <#
+  .SYNOPSIS
+  Retrieve users role mappings from Network Insight
+
+  .DESCRIPTION
+  Users from AD, VIDM or LOCAL can be mapped to vRNI
+  member roles (ADMIN or MEMBER) and this cmdlet gets the
+  current mappings.
+
+  The public API currently only supports the VIDM type.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISettingsUser -Type VIDM
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      [ValidateSet ("LDAP", "LOCAL", "VIDM")]
+      # User type; where is the group from?
+      [string]$Type,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method "GET" -Uri "/api/ni/settings/users?type=$($Type)"
+  $result.results
+}
+
+function Set-vRNISettingsUser
+{
+  <#
+  .SYNOPSIS
+  Configure a user role mapping from Network Insight
+
+  .DESCRIPTION
+  Users from AD, VIDM or LOCAL can be mapped to vRNI
+  member roles (ADMIN or MEMBER) and this cmdlet configures
+  a new mapping
+
+  The public API currently only supports the VIDM type.
+
+  .EXAMPLE
+  PS C:\> Set-vRNISettingsUser -Type VIDM -Username martijn -Domain mylab.local -Role ADMIN
+
+  .EXAMPLE
+  PS C:\> Set-vRNISettingsUser -Type VIDM -Username visitor -Domain mylab.local -Role MEMBER
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      # Type user group (only VIDM supported for now)
+      [ValidateSet ("VIDM")]
+      [string]$Type,
+    [Parameter (Mandatory=$true)]
+      # Username in vIDM
+      [string]$Username,
+    [Parameter (Mandatory=$true)]
+      # Domain in vIDM that this user belongs to
+      [string]$Domain,
+    [Parameter (Mandatory=$true)]
+      # Role that this user will get in vRNI
+      [ValidateSet ("ADMIN", "MEMBER")]
+      [string]$Role,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Initialise the body
+  $body = @{
+    username = $Username
+    domain = $Domain
+    role = $Role
+    display_name = $Username
+  }
+
+  # Initialise the RestMethod params
+  $listParams = @{
+    Connection = $Connection
+    Method = 'POST'
+    Uri = "/api/ni/settings/users/vidm"
+    Body = $body | ConvertTo-Json
+  }
+
+  $result = Invoke-vRNIRestMethod @listParams
+  $result
+}
+
+function Remove-vRNISettingsUser
+{
+  <#
+  .SYNOPSIS
+  Remove a user role mapping from Network Insight
+
+  .DESCRIPTION
+  Users from AD, VIDM or LOCAL can be mapped to vRNI
+  member roles (ADMIN or MEMBER) and this cmdlet removes
+  a mapping
+
+  The public API currently only supports the VIDM type.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISettingsUser | Where {$_.username -eq "martijn"} | Remove-vRNISettingsUser
+
+  #>
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNISettingsUser
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$User,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+    $User | Foreach-Object {
+      $oThisUser = $_
+      # All we have to do is to send a DELETE request to URI /api/ni/settings/users/$userId, so
+      # form the URI and send the DELETE request to vRNI
+      $URI = "/api/ni/settings/users/$($oThisUser.id)"
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri $URI
+    } ## end Foreach-Object
+  } ## end process
 }
 
 # Call Init function
