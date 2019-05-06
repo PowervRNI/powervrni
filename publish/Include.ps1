@@ -61,8 +61,18 @@ $FunctionsToExport = @(
     'Remove-vRNIEastWestIP',
     'Get-vRNINorthSouthIP',
     'Add-vRNINorthSouthIP',
-    'Remove-vRNINorthSouthIP'
-    
+    'Remove-vRNINorthSouthIP',
+    'Get-vRNISettingsVIDM',
+    'Set-vRNISettingsVIDM',
+    'Get-vRNISettingsUserGroup',
+    'Set-vRNISettingsUserGroup',
+    'Remove-vRNISettingsUserGroup',
+    'Get-vRNISettingsUser',
+    'Set-vRNISettingsUser',
+    'Remove-vRNISettingsUser',
+    'Get-vRNIAuditLogs',
+    'Get-vRNIApplicationMemberVM'
+
 )
 
 # Manifest settings
