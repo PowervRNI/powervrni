@@ -1,7 +1,7 @@
-# vRealize Network Insight PowerShell module
+# VMware vRealize Network Insight PowerShell module
 # Martijn Smit (@smitmartijn)
 # msmit@vmware.com
-# Version 1.4
+# Version 1.5
 
 
 # Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource
@@ -19,7 +19,22 @@ $Script:DatasourceURLs.Add("hponeview", @("/data-sources/hpov-managers"))
 $Script:DatasourceURLs.Add("hpvcmanager", @("/data-sources/hpvc-managers"))
 $Script:DatasourceURLs.Add("checkpointfirewall", @("/data-sources/checkpoint-firewalls"))
 $Script:DatasourceURLs.Add("panfirewall", @("/data-sources/panorama-firewalls"))
-$Script:DatasourceURLs.Add("all", @("/data-sources/vcenters", "/data-sources/nsxv-managers", "/data-sources/cisco-switches", "/data-sources/arista-switches", "/data-sources/dell-switches", "/data-sources/brocade-switches", "/data-sources/juniper-switches", "/data-sources/ucs-managers", "/data-sources/hpov-managers", "/data-sources/hpvc-managers", "/data-sources/checkpoint-firewalls", "/data-sources/panorama-firewalls"))
+$Script:DatasourceURLs.Add("infoblox", @("/data-sources/infoblox-managers"))
+$Script:DatasourceURLs.Add("nsxpolicymanager", @("/data-sources/policy-managers"))
+
+$Script:DatasourceURLs.Add("f5-bigip", @("/data-sources/f5-bigip"))
+$Script:DatasourceURLs.Add("huawei", @("/data-sources/huawei"))
+$Script:DatasourceURLs.Add("ciscoaci", @("/data-sources/cisco-aci"))
+$Script:DatasourceURLs.Add("pks", @("/data-sources/pks"))
+$Script:DatasourceURLs.Add("kubernetes", @("/data-sources/kubernetes-clusters"))
+$Script:DatasourceURLs.Add("servicenow", @("/data-sources/servicenow-instances"))
+
+# Collect a list of all data source URLs to be used to retrieve "all" data sources
+$allURLs = New-Object System.Collections.Generic.List[System.Object]
+foreach ($h in $Script:DatasourceURLs.GetEnumerator()) {
+  $allURLs += $h.Value
+}
+$Script:DatasourceURLs.Add("all", $allURLs)
 
 # Keep another list handy which translates the internal vRNI Names for datasources to their relative URLs
 $Script:DatasourceInternalURLs = @{}
@@ -36,6 +51,14 @@ $Script:DatasourceInternalURLs.Add("HPOneViewManagerDataSource", "/data-sources/
 $Script:DatasourceInternalURLs.Add("HPVCManagerDataSource", "/data-sources/hpvc-managers")
 $Script:DatasourceInternalURLs.Add("CheckpointFirewallDataSource", "/data-sources/checkpoint-firewalls")
 $Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panorama-firewalls")
+$Script:DatasourceInternalURLs.Add("InfobloxManagerDataSource", "/data-sources/infoblox-managers")
+$Script:DatasourceInternalURLs.Add("PolicyManagerDataSource", "/data-sources/policy-managers")
+$Script:DatasourceInternalURLs.Add("GDDataSource", "/data-sources/f5-bigip")
+#$Script:DatasourceInternalURLs.Add("GDDataSource", "/data-sources/huawei")
+$Script:DatasourceInternalURLs.Add("CiscoACIDataSource", "/data-sources/cisco-aci")
+$Script:DatasourceInternalURLs.Add("PKSDataSource", "/data-sources/pks")
+$Script:DatasourceInternalURLs.Add("KubernetesDataSource", "/data-sources/kubernetes-clusters")
+$Script:DatasourceInternalURLs.Add("ServiceNowDataSource", "/data-sources/servicenow-instances")
 
 # This list will be used in Get-vRNIEntity to map entity URLs to their IDs so we can use those IDs in /entities/fetch
 $Script:EntityURLtoIdMapping = @{}
@@ -60,6 +83,7 @@ $Script:EntityURLtoIdMapping.Add("vcenter-managers", "VCenterManager")
 $Script:EntityURLtoIdMapping.Add("nsx-managers", "NSXVManager")
 $Script:EntityURLtoIdMapping.Add("distributed-virtual-switches", "DistributedVirtualSwitch")
 $Script:EntityURLtoIdMapping.Add("distributed-virtual-portgroups", "DistributedVirtualPortgroup")
+$Script:EntityURLtoIdMapping.Add("firewall-managers", "CheckpointManager")
 
 # Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing some of the base functions &
 # principles on which this module is built on.
@@ -197,7 +221,7 @@ function Invoke-vRNIRestMethod
     $headerDict.add("Authorization", "NetworkInsight $authtoken")
   }
   # Add the Cloud Services Platform token if available (means we're using Network Insight as a Service)
-  if($null -ne $connection) 
+  if($null -ne $connection)
   {
     if($null -ne $connection.CSPToken) {
       $headerDict.remove("Authorization")
@@ -501,7 +525,7 @@ function Connect-NIServer
 {
   <#
   .SYNOPSIS
-  Connects to the Network Insight Service on the VMware Cloud Services 
+  Connects to the Network Insight Service on the VMware Cloud Services
   Platform and constructs a connection object.
 
   .DESCRIPTION
@@ -516,7 +540,7 @@ function Connect-NIServer
 
   .EXAMPLE
   PS C:\> Connect-NIServer -RefreshToken xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-  Connect to the VMware Cloud Services Portal with your specified Refresh Token. 
+  Connect to the VMware Cloud Services Portal with your specified Refresh Token.
   The cmdlet will connect to the CSP, validate the token and will return an
   access token. Returns the connection object, if successful.
   #>
@@ -659,42 +683,79 @@ function Get-vRNIDataSource
   Retrieves the defaults of all NSX Managers added to vRNI as a datasource.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Which datasource type to get - TODO: make this a dynamic param to get the values from $Script:data
-      [ValidateSet ("vcenter", "nsxv", "nsxt", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall", "all")]
-      [string]$DataSourceType="all",
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
       [ValidateNotNullOrEmpty()]
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
 
-  # Use this as a return container
-  $datasources = [System.Collections.ArrayList]@()
-
-  # Because each datasource type has its unique URL (/api/ni/data-sources/vcenter, /data-sources/ucs-manager, etc),
-  # and we want all the datasource information, loop through the URLs of the types we want to retrieve and
-  $datasource_types_to_get = $Script:DatasourceURLs.$DataSourceType
-  foreach($datasource_uri in $datasource_types_to_get)
+  DynamicParam
   {
-    # Energize!
-    $response = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)"
+    # Use a dynamic parameter to get a list of all data source names from $Script:DatasourceURLs
+    $ParameterName = 'DataSourceType'
 
-    # Process results, if there are datasources of this type. The results of the /api/ni/data-sources/$TYPE call is a
-    # list of datasource IDs and not much more. We take that ID and do a call for details on that datasource
-    if($response.results -ne "")
+    # Form attribute parameters
+    $RuntimeParameterDictionary = New-Object System.Management.Automation.RuntimeDefinedParameterDictionary
+    $AttributeCollection = New-Object System.Collections.ObjectModel.Collection[System.Attribute]
+
+    # Create and set the parameters' attributes
+    $ParameterAttribute = New-Object System.Management.Automation.ParameterAttribute
+    $ParameterAttribute.Mandatory = $false
+    $AttributeCollection.Add($ParameterAttribute)
+
+    # Generate and set the ValidateSet
+    # Collect a list of all data source names
+    $allDS = New-Object System.Collections.Generic.List[System.Object]
+    foreach ($h in $Script:DatasourceURLs.GetEnumerator()) {
+      $allDS += $h.Name
+    }
+
+    $ValidateSetAttribute = New-Object System.Management.Automation.ValidateSetAttribute($allDS)
+
+    # Add the ValidateSet to the attributes collection
+    $AttributeCollection.Add($ValidateSetAttribute)
+
+    # Create and return the dynamic parameter
+    $RuntimeParameter = New-Object System.Management.Automation.RuntimeDefinedParameter($ParameterName, [string], $AttributeCollection)
+    $RuntimeParameterDictionary.Add($ParameterName, $RuntimeParameter)
+    return $RuntimeParameterDictionary
+  }
+  Process
+  {
+    # Bind the parameter to a friendly variable
+    New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
+
+    if(!$DataSourceType) {
+      $DataSourceType = "all"
+    }
+
+    # Use this as a return container
+    $datasources = [System.Collections.ArrayList]@()
+
+    # Because each datasource type has its unique URL (/api/ni/data-sources/vcenter, /data-sources/ucs-manager, etc),
+    # and we want all the datasource information, loop through the URLs of the types we want to retrieve and
+    $datasource_types_to_get = $Script:DatasourceURLs.$DataSourceType
+    foreach($datasource_uri in $datasource_types_to_get)
     {
-      foreach ($datasource in $response.results)
+      # Energize!
+      $response = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)"
+
+      # Process results, if there are datasources of this type. The results of the /api/ni/data-sources/$TYPE call is a
+      # list of datasource IDs and not much more. We take that ID and do a call for details on that datasource
+      if($response.results -ne "")
       {
-        # Retrieve datasource details and store it
-        $datasource_detail = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)/$($datasource.entity_id)"
-        $datasources.Add($datasource_detail) | Out-Null
+        foreach ($datasource in $response.results)
+        {
+          # Retrieve datasource details and store it
+          $datasource_detail = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)/$($datasource.entity_id)"
+          $datasources.Add($datasource_detail) | Out-Null
+        }
       }
     }
-  }
 
-  # Return all found data sources
-  $datasources
+    # Return all found data sources
+    $datasources
+  }
 }
 
 function New-vRNIDataSource
@@ -727,10 +788,6 @@ function New-vRNIDataSource
   [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
 
   param (
-    [Parameter (Mandatory=$true)]
-      # Which datasource type to create - TODO: make this a dynamic param to get the values from $Script:data
-      [ValidateSet ("vcenter", "nsxv", "nsxt", "ciscoswitch", "aristaswitch", "dellswitch", "brocadeswitch", "juniperswitch", "ciscoucs", "hponeview", "hpvcmanager", "checkpointfirewall", "panfirewall")]
-      [string]$DataSourceType,
     [Parameter (Mandatory=$true)]
       # Username to use to login to the datasource
       [ValidateNotNullOrEmpty()]
@@ -801,59 +858,95 @@ function New-vRNIDataSource
       [ValidateNotNullOrEmpty()]
       [PSCustomObject]$Connection=$defaultvRNIConnection
   )
+  DynamicParam
+  {
+    # Use a dynamic parameter to get a list of all data source names from $Script:DatasourceURLs
+    $ParameterName = 'DataSourceType'
 
-  if($IP -ne "" -And $FDQN -ne "") {
-    throw "Please only provide the FDQN or the IP address for the datasource, not both."
-  }
+    # Form attribute parameters
+    $RuntimeParameterDictionary = New-Object System.Management.Automation.RuntimeDefinedParameterDictionary
+    $AttributeCollection = New-Object System.Collections.ObjectModel.Collection[System.Attribute]
 
-  # Check if the NSXDS parameter set is used when adding a NSX Manager as datasource
-  if($DataSourceType -eq "nsxv" -And $PSCmdlet.ParameterSetName -ne "NSXDS") {
-    throw "Please provide the NSX parameters when adding a NSX Manager."
-  }
+    # Create and set the parameters' attributes
+    $ParameterAttribute = New-Object System.Management.Automation.ParameterAttribute
+    $ParameterAttribute.Mandatory = $true
+    $AttributeCollection.Add($ParameterAttribute)
 
-  # Check if the switch type is provided, when adding a Cisco of Dell switch
-  if($DataSourceType -eq "ciscoswitch" -And $PSCmdlet.ParameterSetName -ne "CISCOSWITCH") {
-    throw "Please provide the -CiscoSwitchType parameter when adding a Cisco switch."
-  }
-  if($DataSourceType -eq "dellswitch" -And $PSCmdlet.ParameterSetName -ne "DELLSWITCH") {
-    throw "Please provide the -DellSwitchType parameter when adding a Dell switch."
-  }
-
-  # Format request with all given data
-  $requestFormat = @{
-    "ip" = $IP
-    "fqdn" = $FDQN
-    "proxy_id" = $CollectorVMId
-    "nickname" = $Nickname
-    "notes" = $Notes
-    "enabled" = $Enabled
-    "credentials" = @{
-      "username" = $Username
-      "password" = $Password
+    # Generate and set the ValidateSet
+    # Collect a list of all data source names
+    $allDS = New-Object System.Collections.Generic.List[System.Object]
+    foreach ($h in $Script:DatasourceURLs.GetEnumerator()) {
+      $allDS += $h.Name
     }
-  }
 
-  # If we're adding a NSX Manager, also add the NSX parameters to the body
-  if($PSCmdlet.ParameterSetName -eq "NSXDS") {
-    $requestFormat.vcenter_id = $NSXvCenterID
-    $requestFormat.ipfix_enabled = $NSXEnableIPFIX
-    $requestFormat.central_cli_enabled = $NSXEnableCentralCLI
-  }
+    $ValidateSetAttribute = New-Object System.Management.Automation.ValidateSetAttribute($allDS)
 
-  # When adding a Cisco or Dell switch, provide the switch_type key in the body
-  if($DataSourceType -eq "ciscoswitch") {
-    $requestFormat.switch_type = $CiscoSwitchType
-  }
-  if($DataSourceType -eq "dellswitch") {
-    $requestFormat.switch_type = $DellSwitchType
-  }
+    # Add the ValidateSet to the attributes collection
+    $AttributeCollection.Add($ValidateSetAttribute)
 
-  # Convert the hash to JSON, form the URI and send the request to vRNI
-  $requestBody = ConvertTo-Json $requestFormat
-  $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])"
+    # Create and return the dynamic parameter
+    $RuntimeParameter = New-Object System.Management.Automation.RuntimeDefinedParameter($ParameterName, [string], $AttributeCollection)
+    $RuntimeParameterDictionary.Add($ParameterName, $RuntimeParameter)
+    return $RuntimeParameterDictionary
+  }
+  Process
+  {
+    # Bind the parameter to a friendly variable
+    New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
 
-  $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI -Body $requestBody
-  $response
+    if($IP -ne "" -And $FDQN -ne "") {
+      throw "Please only provide the FDQN or the IP address for the datasource, not both."
+    }
+
+    # Check if the NSXDS parameter set is used when adding a NSX Manager as datasource
+    if($DataSourceType -eq "nsxv" -And $PSCmdlet.ParameterSetName -ne "NSXDS") {
+      throw "Please provide the NSX parameters when adding a NSX Manager."
+    }
+
+    # Check if the switch type is provided, when adding a Cisco of Dell switch
+    if($DataSourceType -eq "ciscoswitch" -And $PSCmdlet.ParameterSetName -ne "CISCOSWITCH") {
+      throw "Please provide the -CiscoSwitchType parameter when adding a Cisco switch."
+    }
+    if($DataSourceType -eq "dellswitch" -And $PSCmdlet.ParameterSetName -ne "DELLSWITCH") {
+      throw "Please provide the -DellSwitchType parameter when adding a Dell switch."
+    }
+
+    # Format request with all given data
+    $requestFormat = @{
+      "ip" = $IP
+      "fqdn" = $FDQN
+      "proxy_id" = $CollectorVMId
+      "nickname" = $Nickname
+      "notes" = $Notes
+      "enabled" = $Enabled
+      "credentials" = @{
+        "username" = $Username
+        "password" = $Password
+      }
+    }
+
+    # If we're adding a NSX Manager, also add the NSX parameters to the body
+    if($PSCmdlet.ParameterSetName -eq "NSXDS") {
+      $requestFormat.vcenter_id = $NSXvCenterID
+      $requestFormat.ipfix_enabled = $NSXEnableIPFIX
+      $requestFormat.central_cli_enabled = $NSXEnableCentralCLI
+    }
+
+    # When adding a Cisco or Dell switch, provide the switch_type key in the body
+    if($DataSourceType -eq "ciscoswitch") {
+      $requestFormat.switch_type = $CiscoSwitchType
+    }
+    if($DataSourceType -eq "dellswitch") {
+      $requestFormat.switch_type = $DellSwitchType
+    }
+
+    # Convert the hash to JSON, form the URI and send the request to vRNI
+    $requestBody = ConvertTo-Json $requestFormat
+    $URI = "/api/ni$($Script:DatasourceURLs.$DataSourceType[0])"
+
+    $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri $URI -Body $requestBody
+    $response
+  }
 }
 
 function Remove-vRNIDataSource
@@ -1034,8 +1127,10 @@ function Get-vRNIDataSourceSNMPConfig
       # Sanity check on the data source type: only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP config
       if($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "BrocadeSwitchDataSource" -And $oThisDatasource.entity_type -ne "JuniperSwitchDataSource" -And
-        $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource") {
-        throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP configuration."
+        $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource" -And
+        $oThisDatasource.entity_type -ne "CiscoACIDataSource" -And $oThisDatasource.entity_type -ne "GDDataSource")
+      {
+        throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, Arista, F5, Huawei & UCS have SNMP configuration."
       }
 
       # All we have to do is to send a GET request to URI /api/ni/$DataSourceType/$DatasourceId/snmp-config
@@ -1296,6 +1391,45 @@ function Get-vRNIApplication
   }
 
   $applications
+}
+
+function Get-vRNIApplicationMemberVM
+{
+  <#
+  .SYNOPSIS
+  Get a list of VMs in an application from vRealize Network Insight.
+
+  .DESCRIPTION
+  Within vRNI there are applications, which can be viewed as groups of VMs.
+  These groups can be used to group the VMs of a certain application together,
+  and filter on searches within vRNI. For instance, you can generate recommended
+  firewall rules based on an application group.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIApplication My3TierApp | Get-vRNIApplicationMemberVM
+  Show the member VMs for the application called "My3TierApp"
+  #>
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true)]
+      # Application object, gotten from Get-vRNIApplication
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$Application,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process
+  {
+    ## do Foreach-Object, so as to enable user to pass multiple Application objects for value of -Application parameter
+    $Application | Foreach-Object {
+      $oThisApplication = $_
+      # Get a list of all VMs for this application
+      $vm_list = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($oThisApplication.entity_id)/members/vms"
+      $vm_list.results
+    } ## end Foreach-Object
+  } ## end process
 }
 
 function Get-vRNIApplicationTier
@@ -2584,6 +2718,42 @@ function Get-vRNIDistributedSwitchPortGroup
   $results
 }
 
+function Get-vRNICheckPointManagers
+{
+  <#
+  .SYNOPSIS
+  Get available CheckPoint Firewall Managers from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all CheckPoint Firewall Managers in your environment
+  and this cmdlet will help you discover these managers.
+
+  .EXAMPLE
+  PS C:\> Get-vRNICheckPointManagers
+  Get all CheckPoint Firewall Managers in the vRNI environment.
+
+  .EXAMPLE
+  PS C:\> Get-vRNICheckPointManagers CP01
+  Get only the CheckPoint Firewall Managers called 'CP01'
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "firewall-managers" -Name $Name -Limit $Limit
+  $results
+}
+
 #----------------------------------------------------------------------------------------------------------------#
 #----------------------------------------------------------------------------------------------------------------#
 #----------------------------------------- Storage Entities -----------------------------------------------------#
@@ -2791,7 +2961,837 @@ function Get-vRNIRecommendedRulesNsxBundle
   Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/micro-seg/recommended-rules/nsx" -Body $requestBody -OutFile $OutFile
 }
 
+#####################################################################################################################
+#####################################################################################################################
+#########################################  Settings Management ######################################################
+#####################################################################################################################
+#####################################################################################################################
 
+
+function New-vRNISubnetMapping
+{
+  <#
+  .SYNOPSIS
+  Create a new IP Subnet to VLAN ID mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. When vRNI does not have full visibility on the physical
+  network and can't discover the mappings between VLANs and subnets,
+  you can use subnet mappings to manually determine which subnets belong
+  to which VLANs.
+
+  .EXAMPLE
+  PS C:\> New-vRNISubnetMapping -VLANID 10 -CIDR 192.168.0.0/24
+
+  .EXAMPLE
+  PS C:\> New-vRNISubnetMapping -VLANID 11 -CIDR 192.168.0.0/16
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      # The VLAN ID for this mapping
+      [int]$VLANID,
+    [Parameter (Mandatory=$true)]
+      # The CIDR mapped to the given VLAN ID
+      [string]$CIDR,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = @{
+    "cidr" = $CIDR
+    "vlan_id" = $VLANID
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/subnet-mappings" -Body $requestBody
+}
+
+function Get-vRNISubnetMapping
+{
+  <#
+  .SYNOPSIS
+  Retrieve all IP Subnet to VLAN ID mappings within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. When vRNI does not have full visibility on the physical
+  network and can't discover the mappings between VLANs and subnets,
+  you can use subnet mappings to manually determine which subnets belong
+  to which VLANs.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISubnetMapping
+
+  #>
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri "/api/ni/settings/subnet-mappings"
+  return $results.results
+}
+
+function Get-vRNIEastWestIP
+{
+  <#
+  .SYNOPSIS
+  Retrieve all East-West IP mappings within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using public IPs for workloads inside
+  the datacenter, you should add them to the East-West IP mappings.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIEastWestIP
+
+  #>
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri "/api/ni/settings/ip-tags/EAST_WEST"
+  return $results
+}
+
+function Add-vRNIEastWestIP
+{
+  <#
+  .SYNOPSIS
+  Adds a new East-West IP mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using public IPs for workloads inside
+  the datacenter, you should add them to the East-West IP mappings.
+
+  .EXAMPLE
+  PS C:\> Add-vRNIEastWestIP -Subnet 80.182.12.0/24
+
+  .EXAMPLE
+  PS C:\> Add-vRNIEastWestIP -IP_Range_Start 90.23.12.1 -IP_Range_End 90.23.12.100
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
+      # The subnet to add to the IP mappings
+      [string]$Subnet,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range start to add to the IP mappings
+      [string]$IP_Range_Start,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range end to add to the IP mappings
+      [string]$IP_Range_End,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = ""
+  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
+  {
+    $requestFormat = @{
+      "tag_id" = "EAST_WEST"
+      "subnets" = @($Subnet)
+    }
+  }
+  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
+  {
+    $requestFormat = @{
+      "tag_id" = "EAST_WEST"
+      "ip_address_ranges" = @( @{
+        "start_ip" = $IP_Range_Start
+        "end_ip" = $IP_Range_End
+      } )
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/ip-tags/EAST_WEST/add" -Body $requestBody
+  return $results
+}
+
+function Remove-vRNIEastWestIP
+{
+  <#
+  .SYNOPSIS
+  Removes a East-West IP mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using public IPs for workloads inside
+  the datacenter, you should add them to the East-West IP mappings.
+
+  .EXAMPLE
+  PS C:\> Remove-vRNIEastWestIP -Subnet 80.182.12.0/24
+
+  .EXAMPLE
+  PS C:\> Remove-vRNIEastWestIP -IP_Range_Start 90.23.12.1 -IP_Range_End 90.23.12.100
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
+      # The subnet to remove from the IP mappings
+      [string]$Subnet,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range start to remove from the IP mappings
+      [string]$IP_Range_Start,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range end to remove from the IP mappings
+      [string]$IP_Range_End,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = ""
+  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
+  {
+    $requestFormat = @{
+      "tag_id" = "EAST_WEST"
+      "subnets" = @($Subnet)
+    }
+  }
+  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
+  {
+    $requestFormat = @{
+      "tag_id" = "EAST_WEST"
+      "ip_address_ranges" = @( @{
+        "start_ip" = $IP_Range_Start
+        "end_ip" = $IP_Range_End
+      } )
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/ip-tags/EAST_WEST/remove" -Body $requestBody
+  return $results
+}
+
+function Get-vRNINorthSouthIP
+{
+  <#
+  .SYNOPSIS
+  Retrieve all North-South IP mappings within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using internal IPs outside the datacenter,
+  you should add them to the North-South IP mappings.
+
+  .EXAMPLE
+  PS C:\> Get-vRNINorthSouthIP
+
+  #>
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri "/api/ni/settings/ip-tags/INTERNET"
+  return $results
+}
+
+function Add-vRNINorthSouthIP
+{
+  <#
+  .SYNOPSIS
+  Add a new North-South IP mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using internal IPs outside the datacenter,
+  you should add them to the North-South IP mappings.
+
+  .EXAMPLE
+  PS C:\> Add-vRNINorthSouthIP -Subnet 80.182.12.0/24
+
+  .EXAMPLE
+  PS C:\> Add-vRNINorthSouthIP -IP_Range_Start 90.23.12.1 -IP_Range_End 90.23.12.100
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
+      # The subnet to add to the IP mappings
+      [string]$Subnet,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range start to add to the IP mappings
+      [string]$IP_Range_Start,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range end to add to the IP mappings
+      [string]$IP_Range_End,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = ""
+  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
+  {
+    $requestFormat = @{
+      "tag_id" = "INTERNET"
+      "subnets" = @($Subnet)
+    }
+  }
+  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
+  {
+    $requestFormat = @{
+      "tag_id" = "INTERNET"
+      "ip_address_ranges" = @( @{
+        "start_ip" = $IP_Range_Start
+        "end_ip" = $IP_Range_End
+      } )
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/ip-tags/INTERNET/add" -Body $requestBody
+  return $results
+}
+
+function Remove-vRNINorthSouthIP
+{
+  <#
+  .SYNOPSIS
+  Remove a North-South IP mapping within vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight collects netflow data and analyses the
+  network flows. If you are using internal IPs outside the datacenter,
+  you should add them to the North-South IP mappings.
+
+  .EXAMPLE
+  PS C:\> Remove-vRNINorthSouthIP -Subnet 80.182.12.0/24
+
+  .EXAMPLE
+  PS C:\> Remove-vRNINorthSouthIP -IP_Range_Start 90.23.12.1 -IP_Range_End 90.23.12.100
+
+  #>
+  param (
+    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
+      # The subnet to remove from the IP mappings
+      [string]$Subnet,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range start to remove from the IP mappings
+      [string]$IP_Range_Start,
+    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
+      # The IP range end to remove from the IP mappings
+      [string]$IP_Range_End,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = ""
+  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
+  {
+    $requestFormat = @{
+      "tag_id" = "INTERNET"
+      "subnets" = @($Subnet)
+    }
+  }
+  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
+  {
+    $requestFormat = @{
+      "tag_id" = "INTERNET"
+      "ip_address_ranges" = @( @{
+        "start_ip" = $IP_Range_Start
+        "end_ip" = $IP_Range_End
+      } )
+    }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/ip-tags/INTERNET/remove" -Body $requestBody
+  return $results
+}
+
+function Get-vRNIAuditLogs
+{
+  <#
+  .SYNOPSIS
+  Retrieve audit logs from Network Insight
+
+  .DESCRIPTION
+  Network Insight logs the actions that are being executed on its interface,
+  and this endpoint is a way to retrieve the audit log
+
+
+  .EXAMPLE
+  PS C:\> Get-vRNIAuditLogs
+
+  .EXAMPLE
+  PS C:\> Get-vRNIAuditLogs -Username "admin@local"
+
+  .EXAMPLE
+  PS C:\> Get-vRNIAuditLogs -Operation "LOGIN"
+
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Filter on username
+      [string]$Username = "",
+    [Parameter (Mandatory=$false)]
+      # Filter on a specific operation (like LOGIN, UPDATE)
+      [string]$Operation = "",
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to start looking up records
+      [int]$StartTime = 0,
+    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
+      # The epoch timestamp of when to stop looking up records
+      [int]$EndTime = 0,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # A list to collect the log records in
+  $logs = [System.Collections.ArrayList]@()
+
+  # Initialise the body
+  $body = @{
+    size =  50
+  }
+
+  # Filter on specific details, if given via params
+  if($Username -ne "") {
+    $body['username'] = $Username
+  }
+  if($Operation -ne "") {
+    $body['operation'] = $Operation
+  }
+
+  # Add a time range, if specified in the params
+  if($PSCmdlet.ParameterSetName -eq "TIMELIMIT" -And ($StartTime -gt 0 -And $EndTime -gt 0)) {
+    $body['time_range'] = @{
+      start_time = $StartTime
+      end_time = $EndTime
+    }
+  }
+
+  # Initialise the RestMethod params
+  $listParams = @{
+    Connection = $Connection
+    Method = 'POST'
+    Uri = "/api/ni/logs/audit"
+    Body = $body | ConvertTo-Json
+  }
+
+  # Loop through the log pages, as it uses pagination to return only a restrict set
+  $hasMoreData = $true
+  $counter = 0
+  while ($hasMoreData)
+  {
+    $logsResponse = Invoke-vRNIRestMethod @listParams
+
+    Write-Verbose ("$($logsResponse.total_count) logs to process")
+    if ($logsResponse.total_count -gt $size) {
+      $body['cursor'] = $logsResponse.cursor
+      $listParams['Body'] = $body | ConvertTo-Json
+    }
+
+    # Save results
+    foreach($log_record in $logsResponse.results)
+    {
+      $logs.Add($log_record) | Out-Null
+      $counter++
+    }
+
+    $remaining = $logsResponse.total_count - $counter
+    if ($remaining -gt 0) {
+      Write-Verbose "$remaining more logs to process"
+      $hasMoreData = $true
+    }
+    else {
+      $hasMoreData = $false
+    }
+  }
+
+  $logs
+}
+
+
+
+#####################################################################################################################
+#####################################################################################################################
+#######################################  vIDM Settings Management ###################################################
+#####################################################################################################################
+#####################################################################################################################
+
+function Get-vRNISettingsVIDM
+{
+  <#
+  .SYNOPSIS
+  Retrieve vIDM settings from Network Insight
+
+  .DESCRIPTION
+  VMware Identity Manager (vIDM) can be used for authentication within
+  vRNI. vIDM offers more authentication & authorization options like
+  multi-factor, location dependent, etc. This cmdlet retrieves the vIDM
+  settings.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISettingsVIDM
+
+  #>
+  param (
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method "GET" -Uri "/api/ni/settings/vidm"
+  $result
+}
+
+function Set-vRNISettingsVIDM
+{
+  <#
+  .SYNOPSIS
+  Retrieve vIDM settings from Network Insight
+
+  .DESCRIPTION
+  VMware Identity Manager (vIDM) can be used for authentication within
+  vRNI. vIDM offers more authentication & authorization options like
+  multi-factor, location dependent, etc. This cmdlet configures the
+  vIDM settings.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISettingsVIDM -Appliance my-vidm-appliance -ClientID vRNI -ClientSecret longstring
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      # vIDM Appliance hostname
+      [string]$Appliance,
+    [Parameter (Mandatory=$true)]
+      # vIDM OAuth2 Client ID
+      [string]$ClientID,
+    [Parameter (Mandatory=$true)]
+      # vIDM OAuth2 Client Secret
+      [string]$ClientSecret,
+    [Parameter (Mandatory=$false)]
+      # Optional vIDM OAuth2 SHA Thumbprint
+      [string]$SHA_Thumbprint = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Initialise the body
+  $body = @{
+    vidm_appliance = $Appliance
+    client_id = $ClientID
+    client_secret = $ClientSecret
+    sha_thumbprint = $SHA_Thumbprint
+    enable = $true
+  }
+
+  # Initialise the RestMethod params
+  $listParams = @{
+    Connection = $Connection
+    Method = 'POST'
+    Uri = "/api/ni/settings/vidm"
+    Body = $body | ConvertTo-Json
+  }
+
+  $result = Invoke-vRNIRestMethod @listParams
+  $result
+}
+
+function Get-vRNISettingsUserGroup
+{
+  <#
+  .SYNOPSIS
+  Retrieve user groups settings from Network Insight
+
+  .DESCRIPTION
+  User groups from AD, VIDM or LOCAL can be mapped to vRNI
+  member roles (ADMIN or MEMBER) and this cmdlet gets the
+  current mappings.
+
+  The public API currently only supports the VIDM type.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISettingsUserGroups -Type VIDM
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      [ValidateSet ("LDAP", "LOCAL", "VIDM")]
+      # Group type; where is the group from?
+      [string]$Type,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method "GET" -Uri "/api/ni/settings/user-groups?type=$($Type)"
+  $result.results
+}
+
+function Set-vRNISettingsUserGroup
+{
+  <#
+  .SYNOPSIS
+  Configure user group role mappings.
+
+  .DESCRIPTION
+  User groups from AD, VIDM or LOCAL can be mapped to vRNI
+  member roles (ADMIN or MEMBER) and this cmdlet configures
+  a group to role mapping.
+
+  .EXAMPLE
+  PS C:\> Set-vRNISettingsVIDMUserGroup -Type VIDM -Group vrni-admins -Domain mylab.local -Role ADMIN
+  Map group 'vrni-admins' in vIDM to the vRNI ADMIN role
+
+  .EXAMPLE
+  PS C:\> Set-vRNISettingsVIDMUserGroup -Type VIDM -Group vrni-members -Domain mylab.local -Role MEMBER
+  Map group 'vrni-members' in vIDM to the vRNI MEMBER role
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      # Type user group (only VIDM supported for now)
+      [ValidateSet ("VIDM")]
+      [string]$Type,
+    [Parameter (Mandatory=$true)]
+      # Name of the group in vIDM
+      [string]$Group,
+    [Parameter (Mandatory=$true)]
+      # Domain in vIDM that this group belongs to
+      [string]$Domain,
+    [Parameter (Mandatory=$true)]
+      # Role that this group will get in vRNI
+      [ValidateSet ("ADMIN", "MEMBER")]
+      [string]$Role,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Initialise the body
+  $body = @{
+    group_name = $Group
+    domain = $Domain
+    role = $Role
+  }
+
+  # Initialise the RestMethod params
+  $listParams = @{
+    Connection = $Connection
+    Method = 'POST'
+    Uri = "/api/ni/settings/user-groups/vidm"
+    Body = $body | ConvertTo-Json
+  }
+
+  $result = Invoke-vRNIRestMethod @listParams
+  $result
+}
+
+function Remove-vRNISettingsUserGroup
+{
+  <#
+  .SYNOPSIS
+  Removes a user group mapping from vRealize Network Insight
+
+  .DESCRIPTION
+  User groups from AD, VIDM or LOCAL can be mapped to vRNI
+  member roles (ADMIN or MEMBER) and this cmdlet removes
+  a group to role mapping.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISettingsUserGroup | Where {$_.group_name -eq "mygroup"} | Remove-vRNISettingsUserGroup
+
+  #>
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNISettingsUserGroup
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$Group,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+    $Group | Foreach-Object {
+      $oThisGroup = $_
+      # All we have to do is to send a DELETE request to URI /api/ni/settings/user-groups/$groupId, so
+      # form the URI and send the DELETE request to vRNI
+      $URI = "/api/ni/settings/user-groups/$($oThisGroup.id)"
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri $URI
+    } ## end Foreach-Object
+  } ## end process
+}
+
+function Get-vRNISettingsUser
+{
+  <#
+  .SYNOPSIS
+  Retrieve users role mappings from Network Insight
+
+  .DESCRIPTION
+  Users from AD, VIDM or LOCAL can be mapped to vRNI
+  member roles (ADMIN or MEMBER) and this cmdlet gets the
+  current mappings.
+
+  The public API currently only supports the VIDM type.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISettingsUser -Type VIDM
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      [ValidateSet ("LDAP", "LOCAL", "VIDM")]
+      # User type; where is the group from?
+      [string]$Type,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method "GET" -Uri "/api/ni/settings/users?type=$($Type)"
+  $result.results
+}
+
+function Set-vRNISettingsUser
+{
+  <#
+  .SYNOPSIS
+  Configure a user role mapping from Network Insight
+
+  .DESCRIPTION
+  Users from AD, VIDM or LOCAL can be mapped to vRNI
+  member roles (ADMIN or MEMBER) and this cmdlet configures
+  a new mapping
+
+  The public API currently only supports the VIDM type.
+
+  .EXAMPLE
+  PS C:\> Set-vRNISettingsUser -Type VIDM -Username martijn -Domain mylab.local -Role ADMIN
+
+  .EXAMPLE
+  PS C:\> Set-vRNISettingsUser -Type VIDM -Username visitor -Domain mylab.local -Role MEMBER
+
+  #>
+  param (
+    [Parameter (Mandatory=$true)]
+      # Type user group (only VIDM supported for now)
+      [ValidateSet ("VIDM")]
+      [string]$Type,
+    [Parameter (Mandatory=$true)]
+      # Username in vIDM
+      [string]$Username,
+    [Parameter (Mandatory=$true)]
+      # Domain in vIDM that this user belongs to
+      [string]$Domain,
+    [Parameter (Mandatory=$true)]
+      # Role that this user will get in vRNI
+      [ValidateSet ("ADMIN", "MEMBER")]
+      [string]$Role,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Initialise the body
+  $body = @{
+    username = $Username
+    domain = $Domain
+    role = $Role
+    display_name = $Username
+  }
+
+  # Initialise the RestMethod params
+  $listParams = @{
+    Connection = $Connection
+    Method = 'POST'
+    Uri = "/api/ni/settings/users/vidm"
+    Body = $body | ConvertTo-Json
+  }
+
+  $result = Invoke-vRNIRestMethod @listParams
+  $result
+}
+
+function Remove-vRNISettingsUser
+{
+  <#
+  .SYNOPSIS
+  Remove a user role mapping from Network Insight
+
+  .DESCRIPTION
+  Users from AD, VIDM or LOCAL can be mapped to vRNI
+  member roles (ADMIN or MEMBER) and this cmdlet removes
+  a mapping
+
+  The public API currently only supports the VIDM type.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISettingsUser | Where {$_.username -eq "martijn"} | Remove-vRNISettingsUser
+
+  #>
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNISettingsUser
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$User,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+    $User | Foreach-Object {
+      $oThisUser = $_
+      # All we have to do is to send a DELETE request to URI /api/ni/settings/users/$userId, so
+      # form the URI and send the DELETE request to vRNI
+      $URI = "/api/ni/settings/users/$($oThisUser.id)"
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri $URI
+    } ## end Foreach-Object
+  } ## end process
+}
 
 # Call Init function
 _PvRNI_init
