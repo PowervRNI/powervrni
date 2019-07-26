@@ -20,7 +20,7 @@ $Script:DatasourceURLs.Add("hpvcmanager", @("/data-sources/hpvc-managers"))
 $Script:DatasourceURLs.Add("checkpointfirewall", @("/data-sources/checkpoint-firewalls"))
 $Script:DatasourceURLs.Add("panfirewall", @("/data-sources/panorama-firewalls"))
 $Script:DatasourceURLs.Add("infoblox", @("/data-sources/infoblox-managers"))
-$Script:DatasourceURLs.Add("nsxpolicymanager", @("/data-sources/policy-managers"))
+$Script:DatasourceURLs.Add("vmc-nsxmanager", @("/data-sources/vmc-nsxmanagers"))
 
 $Script:DatasourceURLs.Add("f5-bigip", @("/data-sources/f5-bigip"))
 $Script:DatasourceURLs.Add("huawei", @("/data-sources/huawei"))
@@ -723,7 +723,9 @@ function Get-vRNIDataSource
   Process
   {
     # Bind the parameter to a friendly variable
-    New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
+    if($null -ne $PSBoundParameters.Keys) {
+      New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
+    }
 
     if(!$DataSourceType) {
       $DataSourceType = "all"
@@ -992,6 +994,100 @@ function Remove-vRNIDataSource
       $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)"
 
       Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri $URI
+    } ## end Foreach-Object
+  } ## end process
+}
+
+
+function Update-vRNIDataSource
+{
+  <#
+  .SYNOPSIS
+  Updates the configuration of a datasource from vRealize Network Insight
+
+  .DESCRIPTION
+  Datasources within vRealize Network Insight provide the data shown in
+  the UI. The vRNI Collectors periodically polls the datasources as the
+  source of truth. Typically you have a vCenter, NSX Manager and physical
+  switches as the datasource.
+
+  This cmdlet updates a datasources in vRNI.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Update-vRNIDataSource -Username admin -Password 'VMware1!'
+  Updates the credentials of a vCenter datasource with the nickname "vc.nsx.local"
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Update-vRNIDataSource -Nickname "newnickname"
+  Updates the nickname of a NSX Manager datasource with the nickname "manager.nsx.local"
+  #>
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNIDataSource
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$DataSource,
+
+    [Parameter (Mandatory=$false)]
+      # Nickname for the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$Nickname="",
+
+    [Parameter (Mandatory=$false)]
+      # Username to use to login to the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$Username = "",
+
+    [Parameter (Mandatory=$false)]
+      # Password to use to login to the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$Password = "",
+
+    [Parameter (Mandatory=$false)]
+      # Optional notes for the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$Notes="",
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+
+    if ($Nickname -eq "" -And $Username -eq "" -And $Password -eq "" -And $Notes -eq "") {
+      throw "Provide at least one parameter to update!"
+    }
+
+    $DataSource | Foreach-Object {
+      $oThisDatasource = $_
+
+      # All we have to do is to send a PUT request to URI /api/ni/$DataSourceType/$DatasourceId,
+      # with the modified options
+      if ($Nickname -ne "") {
+        $oThisDatasource.nickname = $Nickname
+      }
+      if ($Username -ne "") {
+        $oThisDatasource.credentials.username = $Username
+
+      }
+      if ($Password -ne "") {
+        $oThisDatasource.credentials.password = $Password
+      }
+      if ($Notes -ne "") {
+        if($null -eq $oThisDatasource.notes) {
+          $oThisDatasource | Add-Member -MemberType NoteProperty -Name 'notes' -Value $Notes
+        }
+        else {
+          $oThisDatasource.notes = $Notes
+        }
+      }
+
+      $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)"
+      $requestBody = ConvertTo-Json $oThisDatasource
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method PUT -Uri $URI -Body $requestBody
     } ## end Foreach-Object
   } ## end process
 }
