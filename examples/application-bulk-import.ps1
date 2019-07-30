@@ -20,6 +20,8 @@ if (!(Test-Path $ApplicationsCSV)) {
   Exit
 }
 
+# Cache for new application entity ids
+$new_apps = @{}
 
 # Read the CSV into memory (using delimiter ';' so you can use Excel to modify it)
 $csvList = Import-CSV $ApplicationsCSV -Delimiter ';'
@@ -31,11 +33,17 @@ foreach($csvLine in $csvList)
   Write-Host "[$(Get-Date)] Processing application $($csvLine.Application).." -ForegroundColor "green"
 
   # First, see if the application exists (otherwise create it)
-  $application = Get-vRNIApplication $csvLine.Application
+  if($new_apps.ContainsKey($csvLine.Application)) {
+    $application = $new_apps[$csvLine.Application]
+  }
+  else {
+    $application = Get-vRNIApplication $csvLine.Application
+  }
 
   if($application -eq $null) {
     Write-Host "[$(Get-Date)] Application $($csvLine.Application) not found, so creating it.." -ForegroundColor "green"
     $application = New-vRNIApplication $csvLine.Application
+    $new_apps.Add($csvLine.Application, $application)
   }
 
   # Format the filter
@@ -57,7 +65,7 @@ foreach($csvLine in $csvList)
     $filter_vm = ""
     # Split VMs by comma and go through the list to add them to the filter string
     $vms = $csvLine."VM Names".Split(",")
-    foreach($vm in $vms) { 
+    foreach($vm in $vms) {
       $filter_vm += "name = '$($vm)' or "
     }
     # Remove last " or "
