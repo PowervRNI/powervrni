@@ -87,6 +87,7 @@ $Script:EntityURLtoIdMapping.Add("nsx-managers", "NSXVManager")
 $Script:EntityURLtoIdMapping.Add("distributed-virtual-switches", "DistributedVirtualSwitch")
 $Script:EntityURLtoIdMapping.Add("distributed-virtual-portgroups", "DistributedVirtualPortgroup")
 $Script:EntityURLtoIdMapping.Add("firewall-managers", "CheckpointManager")
+$Script:EntityURLtoIdMapping.Add("kubernetes-services", "KubernetesService")
 
 # Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing some of the base functions &
 # principles on which this module is built on.
@@ -2212,6 +2213,43 @@ function Get-vRNIFlow
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
   $results = Get-vRNIEntity -Entity_URI "flows" -Limit $Limit -StartTime $StartTime -EndTime $EndTime
+  $results
+}
+
+
+function Get-vRNIKubernetesServices
+{
+  <#
+  .SYNOPSIS
+  Get Kubernetes Services from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all Kubernetes Services in your environment
+  and this cmdlet will help you discover these services.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIKubernetesServices
+  List all Kubernetes Services in your vRNI environment (note: this may take a while if you have a lot of services)
+
+  .EXAMPLE
+  PS C:\> Get-vRNIKubernetesServices -Name my-k8s-service
+  Retrieve only the Kubernetes Service object called "my-k8s-service"
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "kubernetes-services" -Name $Name -Limit $Limit
   $results
 }
 
