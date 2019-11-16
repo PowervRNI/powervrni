@@ -852,6 +852,11 @@ function New-vRNIDataSource
       [ValidateNotNullOrEmpty()]
       [bool]$NSXEnableIPFIX,
 
+    [Parameter (Mandatory=$false, ParameterSetName="NSXDS")]
+      # Enable Virtual Latency (VTEP, VNIC, & PNIC) streaming from NSX to vRNI
+      [ValidateNotNullOrEmpty()]
+      [bool]$NSXEnableLatency = $False,
+
     [Parameter (Mandatory=$true, ParameterSetName="NSXDS")]
       # vCenter ID that this NSX Manager will be linked too
       [ValidateNotNullOrEmpty()]
@@ -975,6 +980,7 @@ function New-vRNIDataSource
       $requestFormat.vcenter_id = $NSXvCenterID
       $requestFormat.ipfix_enabled = $NSXEnableIPFIX
       $requestFormat.central_cli_enabled = $NSXEnableCentralCLI
+      $requestFormat.latency_enabled = $NSXEnableLatency
     }
 
     # When adding a Cisco or Dell switch, provide the switch_type key in the body
