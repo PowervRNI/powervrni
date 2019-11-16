@@ -842,25 +842,25 @@ function New-vRNIDataSource
       [string]$Notes="",
 
     # These params are only required when adding a NSX Manager as datasource
-    [Parameter (Mandatory=$true, ParameterSetName="NSXDS")]
+    [Parameter (Mandatory=$False, ParameterSetName="NSXDS")]
       # Enable the central CLI collection
       [ValidateNotNullOrEmpty()]
-      [bool]$NSXEnableCentralCLI,
+      [bool]$NSXEnableCentralCLI = $True,
 
-    [Parameter (Mandatory=$true, ParameterSetName="NSXDS")]
+    [Parameter (Mandatory=$False, ParameterSetName="NSXDS")]
       # Enable NSX IPFIX as a source
       [ValidateNotNullOrEmpty()]
-      [bool]$NSXEnableIPFIX,
+      [bool]$NSXEnableIPFIX = $True,
 
     [Parameter (Mandatory=$false, ParameterSetName="NSXDS")]
       # Enable Virtual Latency (VTEP, VNIC, & PNIC) streaming from NSX to vRNI
       [ValidateNotNullOrEmpty()]
       [bool]$NSXEnableLatency = $False,
 
-    [Parameter (Mandatory=$true, ParameterSetName="NSXDS")]
+    [Parameter (Mandatory=$False, ParameterSetName="NSXDS")]
       # vCenter ID that this NSX Manager will be linked too
       [ValidateNotNullOrEmpty()]
-      [string]$NSXvCenterID,
+      [string]$NSXvCenterID = "",
 
     # This params is only required when adding a cisco switch
     [Parameter (Mandatory=$true, ParameterSetName="CISCOSWITCH")]
@@ -950,6 +950,10 @@ function New-vRNIDataSource
       throw "Please provide the NSX parameters when adding a NSX Manager."
     }
 
+    if($DataSourceType -eq "nsxv" -And $NSXvCenterID -eq "") {
+      throw "Please provide the NSXvCenterID parameter when adding a NSX-v Manager."
+    }
+
     # Check if the switch type is provided, when adding a Cisco of Dell switch
     if($DataSourceType -eq "ciscoswitch" -And $PSCmdlet.ParameterSetName -ne "CISCOSWITCH") {
       throw "Please provide the -CiscoSwitchType parameter when adding a Cisco switch."
@@ -976,10 +980,15 @@ function New-vRNIDataSource
     }
 
     # If we're adding a NSX Manager, also add the NSX parameters to the body
-    if($PSCmdlet.ParameterSetName -eq "NSXDS") {
+    if($DataSourceType -eq "nsxv") {
       $requestFormat.vcenter_id = $NSXvCenterID
       $requestFormat.ipfix_enabled = $NSXEnableIPFIX
       $requestFormat.central_cli_enabled = $NSXEnableCentralCLI
+      $requestFormat.latency_enabled = $NSXEnableLatency
+    }
+
+    if($DataSourceType -eq "nsxt") {
+      $requestFormat.ipfix_enabled = $NSXEnableIPFIX
       $requestFormat.latency_enabled = $NSXEnableLatency
     }
 
