@@ -31,6 +31,7 @@ $Script:DatasourceURLs.Add("servicenow", @("/data-sources/servicenow-instances")
 $Script:DatasourceURLs.Add("velocloud", @("/data-sources/velocloud"))
 $Script:DatasourceURLs.Add("azure", @("/data-sources/azure-subscriptions"))
 $Script:DatasourceURLs.Add("fortimanager", @("/data-sources/fortinet-firewalls"))
+$Script:DatasourceURLs.Add("generic-device", @("/data-sources/generic-switches"))
 
 # Collect a list of all data source URLs to be used to retrieve "all" data sources
 $allURLs = New-Object System.Collections.Generic.List[System.Object]
@@ -65,6 +66,7 @@ $Script:DatasourceInternalURLs.Add("ServiceNowDataSource", "/data-sources/servic
 $Script:DatasourceInternalURLs.Add("VeloCloudDataSource", "/data-sources/velocloud")
 $Script:DatasourceInternalURLs.Add("AzureDataSource", "/data-sources/azure-subscriptions")
 $Script:DatasourceInternalURLs.Add("FortinetFirewallDataSource", "/data-sources/fortinet-firewalls")
+$Script:DatasourceInternalURLs.Add("GenericSwitchDataSource", "/data-sources/generic-switches")
 
 # This list will be used in Get-vRNIEntity to map entity URLs to their IDs so we can use those IDs in /entities/fetch
 $Script:EntityURLtoIdMapping = @{}
@@ -963,7 +965,7 @@ function New-vRNIDataSource
     }
 
     # Require username and password for everything except Azure, K8s, and OpenShift
-    if(($DataSourceType -ne "azure" -And $DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift") -And ($Username -eq "" -Or $Password -eq "")) {
+    if(($DataSourceType -ne "azure" -And $DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") -And ($Username -eq "" -Or $Password -eq "")) {
       throw "Please provide the Username and Password parameters as the credentials to connect to the data source."
     }
 
@@ -1002,8 +1004,8 @@ function New-vRNIDataSource
       "enabled" = $Enabled
     }
 
-    # For any other data source then K8s or OpenShift, use regular credentials
-    if($DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift") {
+    # For any other data source than a generic (UANI) switch, K8s or OpenShift, use regular credentials
+    if($DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") {
       $requestFormat.credentials = @{
         "username" = $Username
         "password" = $Password
@@ -1011,10 +1013,13 @@ function New-vRNIDataSource
     }
     else
     {
-      # Add KubeConfig and NSX-T Manager entity ID for OpenShift or K8s
-      $requestFormat.manager_id = $NSXTManagerID
-      $requestFormat.credentials = @{
-        "kubeconfig" = $KubeConfig
+      if($DataSourceType -eq "kubernetes" -Or $DataSourceType -ne "openshift")
+      {
+        # Add KubeConfig and NSX-T Manager entity ID for OpenShift or K8s
+        $requestFormat.manager_id = $NSXTManagerID
+        $requestFormat.credentials = @{
+          "kubeconfig" = $KubeConfig
+        }
       }
     }
     if($DataSourceType -eq "pks") {
