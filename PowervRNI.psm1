@@ -29,6 +29,7 @@ $Script:DatasourceURLs.Add("kubernetes", @("/data-sources/kubernetes-clusters"))
 $Script:DatasourceURLs.Add("servicenow", @("/data-sources/servicenow-instances"))
 $Script:DatasourceURLs.Add("velocloud", @("/data-sources/velocloud"))
 $Script:DatasourceURLs.Add("azure", @("/data-sources/azure-subscriptions"))
+$Script:DatasourceURLs.Add("fortimanager", @("/data-sources/fortinet-firewalls"))
 
 # Collect a list of all data source URLs to be used to retrieve "all" data sources
 $allURLs = New-Object System.Collections.Generic.List[System.Object]
@@ -62,6 +63,7 @@ $Script:DatasourceInternalURLs.Add("KubernetesDataSource", "/data-sources/kubern
 $Script:DatasourceInternalURLs.Add("ServiceNowDataSource", "/data-sources/servicenow-instances")
 $Script:DatasourceInternalURLs.Add("VeloCloudDataSource", "/data-sources/velocloud")
 $Script:DatasourceInternalURLs.Add("AzureDataSource", "/data-sources/azure-subscriptions")
+$Script:DatasourceInternalURLs.Add("FortinetFirewallDataSource", "/data-sources/fortinet-firewalls")
 
 # This list will be used in Get-vRNIEntity to map entity URLs to their IDs so we can use those IDs in /entities/fetch
 $Script:EntityURLtoIdMapping = @{}
