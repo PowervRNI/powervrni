@@ -324,6 +324,7 @@ function Invoke-vRNIRestMethod
 
 
   Write-Debug "$(Get-Date -format s) Invoke-RestMethod Result: $response"
+  Write-Debug "$(Get-Date -format s) Invoke-RestMethod Results: $($response.results)"
 
   # Workaround for bug in invoke-restmethod where it doesnt complete the tcp session close to our server after certain calls.
   # We end up with connectionlimit number of tcp sessions in close_wait and future calls die with a timeout failure.
@@ -1974,8 +1975,6 @@ function Get-vRNIEntity
         filter = "Name = '$Name'"
       } | ConvertTo-Json
       $listParams['Method'] = 'POST'
-
-      $finished = $true
     }
 
     # Get a list of all entities
@@ -2011,12 +2010,6 @@ function Get-vRNIEntity
         }
 
         $entities.Add($entity) | Out-Null
-
-        if($Name -eq $entity.name) {
-          $finished = $true
-          break
-        }
-
         $current_count++
 
         # If we are limiting the output, break from the loops and return results
@@ -2047,12 +2040,6 @@ function Get-vRNIEntity
       }
 
       $entities.Add($entity_info) | Out-Null
-
-      if($Name -eq $entity_info.name) {
-        $finished = $true
-        break
-      }
-
       $current_count++
 
       # If we are limiting the output, break from the loops and return results
