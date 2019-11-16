@@ -28,6 +28,7 @@ $Script:DatasourceURLs.Add("pks", @("/data-sources/pks"))
 $Script:DatasourceURLs.Add("kubernetes", @("/data-sources/kubernetes-clusters"))
 $Script:DatasourceURLs.Add("servicenow", @("/data-sources/servicenow-instances"))
 $Script:DatasourceURLs.Add("velocloud", @("/data-sources/velocloud"))
+$Script:DatasourceURLs.Add("azure", @("/data-sources/azure-subscriptions"))
 
 # Collect a list of all data source URLs to be used to retrieve "all" data sources
 $allURLs = New-Object System.Collections.Generic.List[System.Object]
@@ -60,6 +61,7 @@ $Script:DatasourceInternalURLs.Add("PKSDataSource", "/data-sources/pks")
 $Script:DatasourceInternalURLs.Add("KubernetesDataSource", "/data-sources/kubernetes-clusters")
 $Script:DatasourceInternalURLs.Add("ServiceNowDataSource", "/data-sources/servicenow-instances")
 $Script:DatasourceInternalURLs.Add("VeloCloudDataSource", "/data-sources/velocloud")
+$Script:DatasourceInternalURLs.Add("AzureDataSource", "/data-sources/azure-subscriptions")
 
 # This list will be used in Get-vRNIEntity to map entity URLs to their IDs so we can use those IDs in /entities/fetch
 $Script:EntityURLtoIdMapping = @{}
@@ -786,19 +788,25 @@ function New-vRNIDataSource
   PS C:\> $vcId = (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id)
   PS C:\> New-vRNIDataSource -DataSourceType nsxv -FDQN mgr.nsx.local -Username admin -Password secret -Nickname mgr.nsx.local -CollectorVMId $collectorId -Enabled $True -NSXEnableCentralCLI $True -NSXEnableIPFIX $True -NSXvCenterID $vcId
   Adds a new NSX Manager as a data source, auto select the collector ID (if you only have one), enable the NSX Central CLI for collecting data, also enable NSX IPFIX for network datastream insight from the point of view of NSX.
+
+  .EXAMPLE
+  PS C:\> $collectorId = (Get-vRNINodes | Where {$_.ip_address -eq "10.0.0.11"} | Select -ExpandProperty id)
+  PS C:\> New-vRNIDataSource -DataSourceType azure -CollectorVMId $collectorId -Nickname Azure-1 -TenantID xxx-xxx-xxx-xxx-xxx -ApplicationID xxx-xxx-xxx-xxx-xxx -SecretKey secret -SubscriptionID xxx-xxx-xxx-xxx-xxx
+  Adds a new Azure subscription; first gets a specific collector appliance based on IP, and continues to add the Azure subscription based on the application registration information.
+  More info on requirements can be found here: https://docs.vmware.com/en/VMware-vRealize-Network-Insight/5.0/com.vmware.vrni.using.doc/GUID-12272E1A-055F-47E9-9EA6-8693FE86AA02.html
   #>
 
   [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
 
   param (
-    [Parameter (Mandatory=$true)]
+    [Parameter (Mandatory=$false)]
       # Username to use to login to the datasource
       [ValidateNotNullOrEmpty()]
-      [string]$Username,
-    [Parameter (Mandatory=$true)]
+      [string]$Username = "",
+    [Parameter (Mandatory=$false)]
       # Password to use to login to the datasource
       [ValidateNotNullOrEmpty()]
-      [string]$Password,
+      [string]$Password = "",
 
     [Parameter (Mandatory=$false)]
       # The IP address of the datasource
@@ -823,6 +831,7 @@ function New-vRNIDataSource
       # Whether we want to enable the datasource
       [ValidateNotNullOrEmpty()]
       [bool]$Enabled=$True,
+
     [Parameter (Mandatory=$false)]
       # Optional notes for the datasource
       [ValidateNotNullOrEmpty()]
@@ -855,6 +864,28 @@ function New-vRNIDataSource
       # Set the switch type
       [ValidateSet ("FORCE_10_MXL_10", "POWERCONNECT_8024", "S4048", "Z9100", "S6000")]
       [string]$DellSwitchType,
+
+    # These params are only required when adding an Azure subscription as datasource
+    [Parameter (Mandatory=$true, ParameterSetName="AZURE")]
+      # Azure Tenant ID
+      [ValidateNotNullOrEmpty()]
+      [string]$TenantID,
+    [Parameter (Mandatory=$true, ParameterSetName="AZURE")]
+      # Azure Application ID
+      [ValidateNotNullOrEmpty()]
+      [string]$ApplicationID,
+    [Parameter (Mandatory=$true, ParameterSetName="AZURE")]
+      # Azure Secret Key
+      [ValidateNotNullOrEmpty()]
+      [string]$SecretKey,
+    [Parameter (Mandatory=$true, ParameterSetName="AZURE")]
+      # Azure Subscription ID
+      [ValidateNotNullOrEmpty()]
+      [string]$SubscriptionID,
+    [Parameter (Mandatory=$false, ParameterSetName="AZURE")]
+      # Retrieve Flows?
+      [ValidateNotNullOrEmpty()]
+      [bool]$FlowsEnabled = $True,
 
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
@@ -901,6 +932,10 @@ function New-vRNIDataSource
       throw "Please only provide the FDQN or the IP address for the datasource, not both."
     }
 
+    if($DataSourceType -ne "azure" -And ($Username -eq "" -Or $Password -eq "")) {
+      throw "Please provide the Username and Password parameters as the credentials to connect to the data source."
+    }
+
     # Check if the NSXDS parameter set is used when adding a NSX Manager as datasource
     if($DataSourceType -eq "nsxv" -And $PSCmdlet.ParameterSetName -ne "NSXDS") {
       throw "Please provide the NSX parameters when adding a NSX Manager."
@@ -912,6 +947,9 @@ function New-vRNIDataSource
     }
     if($DataSourceType -eq "dellswitch" -And $PSCmdlet.ParameterSetName -ne "DELLSWITCH") {
       throw "Please provide the -DellSwitchType parameter when adding a Dell switch."
+    }
+    if($DataSourceType -eq "azure" -And $PSCmdlet.ParameterSetName -ne "AZURE") {
+      throw "Please provide the TenantID, ApplicationID, SecretKey, and SubscriptionID parameters when adding an Azure subscription."
     }
 
     # Format request with all given data
@@ -941,6 +979,17 @@ function New-vRNIDataSource
     }
     if($DataSourceType -eq "dellswitch") {
       $requestFormat.switch_type = $DellSwitchType
+    }
+
+    # Add the application registration details for Azure subscriptions
+    if($DataSourceType -eq "azure") {
+      $requestFormat.flows_enabled = $FlowsEnabled
+      $requestFormat.credentials = @{
+        "azure_client" = $ApplicationID
+        "azure_key" = $SecretKey
+        "azure_tenant" = $TenantID
+        "azure_subscription" = $SubscriptionID
+      }
     }
 
     # Convert the hash to JSON, form the URI and send the request to vRNI
