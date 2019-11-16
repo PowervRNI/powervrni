@@ -26,6 +26,7 @@ $Script:DatasourceURLs.Add("huawei", @("/data-sources/huawei"))
 $Script:DatasourceURLs.Add("ciscoaci", @("/data-sources/cisco-aci"))
 $Script:DatasourceURLs.Add("pks", @("/data-sources/pks"))
 $Script:DatasourceURLs.Add("kubernetes", @("/data-sources/kubernetes-clusters"))
+$Script:DatasourceURLs.Add("openshift", @("/data-sources/openshift-clusters"))
 $Script:DatasourceURLs.Add("servicenow", @("/data-sources/servicenow-instances"))
 $Script:DatasourceURLs.Add("velocloud", @("/data-sources/velocloud"))
 $Script:DatasourceURLs.Add("azure", @("/data-sources/azure-subscriptions"))
@@ -785,19 +786,30 @@ function New-vRNIDataSource
   .EXAMPLE
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
   PS C:\> New-vRNIDataSource -DataSourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password secret -CollectorVMId $collectorId -Nickname vc.nsx.local
+
   First, get the node ID of the collector VM (assuming there's only one), then add a vCenter located at vc.nsx.local to vRNI.
 
   .EXAMPLE
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
   PS C:\> $vcId = (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id)
   PS C:\> New-vRNIDataSource -DataSourceType nsxv -FDQN mgr.nsx.local -Username admin -Password secret -Nickname mgr.nsx.local -CollectorVMId $collectorId -Enabled $True -NSXEnableCentralCLI $True -NSXEnableIPFIX $True -NSXvCenterID $vcId
+
   Adds a new NSX Manager as a data source, auto select the collector ID (if you only have one), enable the NSX Central CLI for collecting data, also enable NSX IPFIX for network datastream insight from the point of view of NSX.
 
   .EXAMPLE
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.ip_address -eq "10.0.0.11"} | Select -ExpandProperty id)
   PS C:\> New-vRNIDataSource -DataSourceType azure -CollectorVMId $collectorId -Nickname Azure-1 -TenantID xxx-xxx-xxx-xxx-xxx -ApplicationID xxx-xxx-xxx-xxx-xxx -SecretKey secret -SubscriptionID xxx-xxx-xxx-xxx-xxx
+
   Adds a new Azure subscription; first gets a specific collector appliance based on IP, and continues to add the Azure subscription based on the application registration information.
   More info on requirements can be found here: https://docs.vmware.com/en/VMware-vRealize-Network-Insight/5.0/com.vmware.vrni.using.doc/GUID-12272E1A-055F-47E9-9EA6-8693FE86AA02.html
+
+  .EXAMPLE
+  PS C:\> $nsxtId      = (Get-vRNIDataSource -DatasourceType nsxt | Where {$_.nickname -eq "my-nsxt-manager"} | Select -ExpandProperty id)
+  PS C:\> $collectorId = (Get-vRNINodes | Where {$_.ip_address -eq "10.0.0.11"} | Select -ExpandProperty id)
+  PS C:\> $kubeconfig  = (Get-Content ~/.kube/config | Out-String)
+  PS C:\> New-vRNIDataSource -DataSourceType kubernetes -Nickname k8s-cluster-1 -CollectorVMId $collectorId -NSXTManagerID $nsxtId -KubeConfig $kubeconfig
+
+  Add a Kubernetes cluster as a data source. First gets the entity ID of the NSX-T Manager supporting the container network, then vRNI Collector ID, then puts the kubeconfig file into a string, and finally adds the Kubernetes cluster to vRNI.
   #>
 
   [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
@@ -896,6 +908,15 @@ function New-vRNIDataSource
       [ValidateNotNullOrEmpty()]
       [bool]$FlowsEnabled = $True,
 
+    [Parameter (Mandatory=$False, ParameterSetName="KUBERNETES")]
+      # KubeConfig as a string
+      [ValidateNotNullOrEmpty()]
+      [string]$KubeConfig,
+    [Parameter (Mandatory=$True, ParameterSetName="KUBERNETES")]
+      # NSX-T Manager entity ID
+      [ValidateNotNullOrEmpty()]
+      [string]$NSXTManagerID,
+
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
       [ValidateNotNullOrEmpty()]
@@ -941,7 +962,8 @@ function New-vRNIDataSource
       throw "Please only provide the FDQN or the IP address for the datasource, not both."
     }
 
-    if($DataSourceType -ne "azure" -And ($Username -eq "" -Or $Password -eq "")) {
+    # Require username and password for everything except Azure, K8s, and OpenShift
+    if(($DataSourceType -ne "azure" -And $DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift") -And ($Username -eq "" -Or $Password -eq "")) {
       throw "Please provide the Username and Password parameters as the credentials to connect to the data source."
     }
 
@@ -949,10 +971,15 @@ function New-vRNIDataSource
     if($DataSourceType -eq "nsxv" -And $PSCmdlet.ParameterSetName -ne "NSXDS") {
       throw "Please provide the NSX parameters when adding a NSX Manager."
     }
-
     if($DataSourceType -eq "nsxv" -And $NSXvCenterID -eq "") {
       throw "Please provide the NSXvCenterID parameter when adding a NSX-v Manager."
     }
+
+    # Check if the KUBERNETES parameter set is used when adding K8s or OpenShift as datasource
+    if(($DataSourceType -eq "kubernetes" -Or $DataSourceType -eq "openshift" -Or $DataSourceType -eq "pks") -And $PSCmdlet.ParameterSetName -ne "KUBERNETES") {
+      throw "Please provide the KubeConfig and NSXTManagerID parameters when adding an OpenShift or Kubernetes data source. PKS only needs the NSXTManagerID"
+    }
+
 
     # Check if the switch type is provided, when adding a Cisco of Dell switch
     if($DataSourceType -eq "ciscoswitch" -And $PSCmdlet.ParameterSetName -ne "CISCOSWITCH") {
@@ -973,10 +1000,26 @@ function New-vRNIDataSource
       "nickname" = $Nickname
       "notes" = $Notes
       "enabled" = $Enabled
-      "credentials" = @{
+    }
+
+    # For any other data source then K8s or OpenShift, use regular credentials
+    if($DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift") {
+      $requestFormat.credentials = @{
         "username" = $Username
         "password" = $Password
       }
+    }
+    else
+    {
+      # Add KubeConfig and NSX-T Manager entity ID for OpenShift or K8s
+      $requestFormat.manager_id = $NSXTManagerID
+      $requestFormat.credentials = @{
+        "kubeconfig" = $KubeConfig
+      }
+    }
+    if($DataSourceType -eq "pks") {
+      # Add NSX-T Manager entity ID for PKS
+      $requestFormat.manager_id = $NSXTManagerID
     }
 
     # If we're adding a NSX Manager, also add the NSX parameters to the body
