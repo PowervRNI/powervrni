@@ -21,13 +21,13 @@ $Script:DatasourceURLs.Add("checkpointfirewall", @("/data-sources/checkpoint-fir
 $Script:DatasourceURLs.Add("panfirewall", @("/data-sources/panorama-firewalls"))
 $Script:DatasourceURLs.Add("infoblox", @("/data-sources/infoblox-managers"))
 $Script:DatasourceURLs.Add("vmc-nsxmanager", @("/data-sources/vmc-nsxmanagers"))
-
 $Script:DatasourceURLs.Add("f5-bigip", @("/data-sources/f5-bigip"))
 $Script:DatasourceURLs.Add("huawei", @("/data-sources/huawei"))
 $Script:DatasourceURLs.Add("ciscoaci", @("/data-sources/cisco-aci"))
 $Script:DatasourceURLs.Add("pks", @("/data-sources/pks"))
 $Script:DatasourceURLs.Add("kubernetes", @("/data-sources/kubernetes-clusters"))
 $Script:DatasourceURLs.Add("servicenow", @("/data-sources/servicenow-instances"))
+$Script:DatasourceURLs.Add("velocloud", @("/data-sources/velocloud"))
 
 # Collect a list of all data source URLs to be used to retrieve "all" data sources
 $allURLs = New-Object System.Collections.Generic.List[System.Object]
@@ -59,6 +59,7 @@ $Script:DatasourceInternalURLs.Add("CiscoACIDataSource", "/data-sources/cisco-ac
 $Script:DatasourceInternalURLs.Add("PKSDataSource", "/data-sources/pks")
 $Script:DatasourceInternalURLs.Add("KubernetesDataSource", "/data-sources/kubernetes-clusters")
 $Script:DatasourceInternalURLs.Add("ServiceNowDataSource", "/data-sources/servicenow-instances")
+$Script:DatasourceInternalURLs.Add("VeloCloudDataSource", "/data-sources/velocloud")
 
 # This list will be used in Get-vRNIEntity to map entity URLs to their IDs so we can use those IDs in /entities/fetch
 $Script:EntityURLtoIdMapping = @{}
