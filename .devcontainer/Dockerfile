@@ -5,8 +5,7 @@ WORKDIR /root
 
 # Configure apt
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
-    && apt-get -y install --no-install-recommends apt-utils 2>&1
+RUN apt-get update && apt-get -y install --no-install-recommends apt-utils 2>&1
 
 # Install git, process tools, lsb-release (common in install instructions for CLIs)
 RUN apt-get -y install git procps lsb-release

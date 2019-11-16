@@ -1268,7 +1268,7 @@ function Set-vRNIDataSourceSNMPConfig
       [ValidateNotNullOrEmpty()]
       [PSObject]$DataSource,
 
-    [Parameter (Mandatory=$false, ParameterSetName="SNMPv2c")]
+    [Parameter (Mandatory=$false)]
       # Enable SNMP?
       [ValidateNotNullOrEmpty()]
       [bool]$Enabled = $true,
