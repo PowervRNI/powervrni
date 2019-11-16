@@ -3927,6 +3927,100 @@ function Set-vRNISettingsUser
   $result
 }
 
+
+function Set-vRNIUserPassword
+{
+  <#
+  .SYNOPSIS
+  Change the password of a local user to Network Insight
+
+  .DESCRIPTION
+  Local users have a password configured inside Network Insight.
+  This cmdlet allows admins to set passwords of existing users, and
+  allow member to set their own passwords.
+
+  .EXAMPLE
+  PS C:\> Set-vRNIUserPassword -Username admin@local -NewPassword 'mynewpassword'
+
+  .EXAMPLE
+  PS C:\> Set-vRNIUserPassword -Username admin@local
+  PowerShell credential request
+  Input the new password
+  Password for user test@local.corp: ********
+
+  .EXAMPLE
+  PS C:\> $new_cred = Get-Credential
+
+  PowerShell credential request
+  Enter your credentials.
+  User: test@local.corp
+  Password for user test@local.corp: ***********
+  PS C:\>  Set-vRNIUserPassword -Credentials $new_cred
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Username in 'admin@local' format
+      [string]$Username,
+    [Parameter (Mandatory=$false)]
+      # Their new password
+      [string]$NewPassword,
+    [Parameter (Mandatory=$false)]
+      # PSCredential object containing credentials to update
+      [PSCredential]$Credential,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Make sure either -Credential is set, or both -Username and -Password
+  if(($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Username")) -Or
+     ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("NewPassword")))
+  {
+    throw "Specify either -Credential or -Username to pass the new password (if using -Username and omitting -NewPassword, a prompt will be given)"
+  }
+
+  # Build cred object for default auth if user specified username/pass
+  $user_credentials = ""
+  if($PsBoundParameters.ContainsKey("Username"))
+  {
+    # Is the -Password omitted? Prompt securely
+    if(!$PsBoundParameters.ContainsKey("NewPassword")) {
+      $user_credentials = Get-Credential -UserName $Username -Message "Input the new password"
+    }
+    # If the password has been given in cleartext,
+    else {
+      $user_credentials = New-Object System.Management.Automation.PSCredential($Username, $(ConvertTo-SecureString $NewPassword -AsPlainText -Force))
+    }
+  }
+  # If a credential object was given as a parameter, use that
+  elseif($PSBoundParameters.ContainsKey("Credential"))
+  {
+    $user_credentials = $Credential
+  }
+  # If no -Username or -Credential was given, prompt for credentials
+  elseif(!$PSBoundParameters.ContainsKey("Credential")) {
+    $user_credentials = Get-Credential -Message "Input the username and new password"
+  }
+
+  # Initialise the body
+  $body = @{
+    "username" = $user_credentials.Username
+    "new_password" = $user_credentials.GetNetworkCredential().Password
+  }
+
+  # Initialise the RestMethod params
+  $listParams = @{
+    Connection = $Connection
+    Method = 'PUT'
+    Uri = "/api/ni/settings/users/password"
+    Body = $body | ConvertTo-Json
+  }
+
+  $result = Invoke-vRNIRestMethod @listParams
+  $result
+}
+
 function Remove-vRNISettingsUser
 {
   <#
