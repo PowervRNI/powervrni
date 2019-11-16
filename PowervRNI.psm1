@@ -54,7 +54,7 @@ $Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panor
 $Script:DatasourceInternalURLs.Add("InfobloxManagerDataSource", "/data-sources/infoblox-managers")
 $Script:DatasourceInternalURLs.Add("PolicyManagerDataSource", "/data-sources/policy-managers")
 $Script:DatasourceInternalURLs.Add("F5BIGIPDataSource", "/data-sources/f5-bigip")
-$Script:DatasourceInternalURLs.Add("GDDataSource", "/data-sources/huawei")
+$Script:DatasourceInternalURLs.Add("HuaweiSwitchDataSource", "/data-sources/huawei")
 $Script:DatasourceInternalURLs.Add("CiscoACIDataSource", "/data-sources/cisco-aci")
 $Script:DatasourceInternalURLs.Add("PKSDataSource", "/data-sources/pks")
 $Script:DatasourceInternalURLs.Add("KubernetesDataSource", "/data-sources/kubernetes-clusters")
@@ -1224,7 +1224,7 @@ function Get-vRNIDataSourceSNMPConfig
       if($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "BrocadeSwitchDataSource" -And $oThisDatasource.entity_type -ne "JuniperSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource" -And
-        $oThisDatasource.entity_type -ne "CiscoACIDataSource" -And $oThisDatasource.entity_type -ne "GDDataSource" -And
+        $oThisDatasource.entity_type -ne "CiscoACIDataSource" -And $oThisDatasource.entity_type -ne "HuaweiSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "F5BIGIPDataSource")
       {
         throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, Arista, F5, Huawei & UCS have SNMP configuration."
@@ -1321,7 +1321,7 @@ function Set-vRNIDataSourceSNMPConfig
       if($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "BrocadeSwitchDataSource" -And $oThisDatasource.entity_type -ne "JuniperSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource" -And
-        $oThisDatasource.entity_type -ne "F5BIGIPDataSource") {
+        $oThisDatasource.entity_type -ne "F5BIGIPDataSource" -And $oThisDatasource.entity_type -ne "HuaweiSwitchDataSource") {
         throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, F5, Arista switches & UCS have SNMP configuration."
       }
 
