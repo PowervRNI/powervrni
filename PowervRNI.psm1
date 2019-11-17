@@ -383,9 +383,14 @@ function Connect-vRNIServer
   with the given local credentials. Returns the connection object, if successful.
 
   .EXAMPLE
-  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password secret -Domain ld.local
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password secret
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
   with the given LDAP credentials. Returns the connection object, if successful.
+
+  .EXAMPLE
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password secret -UseLocalAuth
+  Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
+  with the given LOCAL credentials. Returns the connection object, if successful.
 
   .EXAMPLE
   PS C:\> $MyConnection = Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password secret
