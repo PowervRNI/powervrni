@@ -1,7 +1,7 @@
 # VMware vRealize Network Insight PowerShell module
 # Martijn Smit (@smitmartijn)
 # msmit@vmware.com
-# Version 1.6
+# Version 1.7
 
 
 # Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource
@@ -20,14 +20,18 @@ $Script:DatasourceURLs.Add("hpvcmanager", @("/data-sources/hpvc-managers"))
 $Script:DatasourceURLs.Add("checkpointfirewall", @("/data-sources/checkpoint-firewalls"))
 $Script:DatasourceURLs.Add("panfirewall", @("/data-sources/panorama-firewalls"))
 $Script:DatasourceURLs.Add("infoblox", @("/data-sources/infoblox-managers"))
-$Script:DatasourceURLs.Add("nsxpolicymanager", @("/data-sources/policy-managers"))
-
+$Script:DatasourceURLs.Add("vmc-nsxmanager", @("/data-sources/vmc-nsxmanagers"))
 $Script:DatasourceURLs.Add("f5-bigip", @("/data-sources/f5-bigip"))
 $Script:DatasourceURLs.Add("huawei", @("/data-sources/huawei"))
 $Script:DatasourceURLs.Add("ciscoaci", @("/data-sources/cisco-aci"))
 $Script:DatasourceURLs.Add("pks", @("/data-sources/pks"))
 $Script:DatasourceURLs.Add("kubernetes", @("/data-sources/kubernetes-clusters"))
+$Script:DatasourceURLs.Add("openshift", @("/data-sources/openshift-clusters"))
 $Script:DatasourceURLs.Add("servicenow", @("/data-sources/servicenow-instances"))
+$Script:DatasourceURLs.Add("velocloud", @("/data-sources/velocloud"))
+$Script:DatasourceURLs.Add("azure", @("/data-sources/azure-subscriptions"))
+$Script:DatasourceURLs.Add("fortimanager", @("/data-sources/fortinet-firewalls"))
+$Script:DatasourceURLs.Add("generic-device", @("/data-sources/generic-switches"))
 
 # Collect a list of all data source URLs to be used to retrieve "all" data sources
 $allURLs = New-Object System.Collections.Generic.List[System.Object]
@@ -53,12 +57,16 @@ $Script:DatasourceInternalURLs.Add("CheckpointFirewallDataSource", "/data-source
 $Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panorama-firewalls")
 $Script:DatasourceInternalURLs.Add("InfobloxManagerDataSource", "/data-sources/infoblox-managers")
 $Script:DatasourceInternalURLs.Add("PolicyManagerDataSource", "/data-sources/policy-managers")
-$Script:DatasourceInternalURLs.Add("GDDataSource", "/data-sources/f5-bigip")
-#$Script:DatasourceInternalURLs.Add("GDDataSource", "/data-sources/huawei")
+$Script:DatasourceInternalURLs.Add("F5BIGIPDataSource", "/data-sources/f5-bigip")
+$Script:DatasourceInternalURLs.Add("HuaweiSwitchDataSource", "/data-sources/huawei")
 $Script:DatasourceInternalURLs.Add("CiscoACIDataSource", "/data-sources/cisco-aci")
 $Script:DatasourceInternalURLs.Add("PKSDataSource", "/data-sources/pks")
 $Script:DatasourceInternalURLs.Add("KubernetesDataSource", "/data-sources/kubernetes-clusters")
 $Script:DatasourceInternalURLs.Add("ServiceNowDataSource", "/data-sources/servicenow-instances")
+$Script:DatasourceInternalURLs.Add("VeloCloudDataSource", "/data-sources/velocloud")
+$Script:DatasourceInternalURLs.Add("AzureDataSource", "/data-sources/azure-subscriptions")
+$Script:DatasourceInternalURLs.Add("FortinetFirewallDataSource", "/data-sources/fortinet-firewalls")
+$Script:DatasourceInternalURLs.Add("GenericSwitchDataSource", "/data-sources/generic-switches")
 
 # This list will be used in Get-vRNIEntity to map entity URLs to their IDs so we can use those IDs in /entities/fetch
 $Script:EntityURLtoIdMapping = @{}
@@ -84,6 +92,7 @@ $Script:EntityURLtoIdMapping.Add("nsx-managers", "NSXVManager")
 $Script:EntityURLtoIdMapping.Add("distributed-virtual-switches", "DistributedVirtualSwitch")
 $Script:EntityURLtoIdMapping.Add("distributed-virtual-portgroups", "DistributedVirtualPortgroup")
 $Script:EntityURLtoIdMapping.Add("firewall-managers", "CheckpointManager")
+$Script:EntityURLtoIdMapping.Add("kubernetes-services", "KubernetesService")
 
 # Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing some of the base functions &
 # principles on which this module is built on.
@@ -180,6 +189,10 @@ function Invoke-vRNIRestMethod
     [Parameter (ParameterSetName="ConnectionObj")]
       # Save content to file
       [string]$OutFile = "",
+    [Parameter (Mandatory=$false,ParameterSetName="Parameter")]
+    [Parameter (ParameterSetName="ConnectionObj")]
+        # Override Content-Type
+        [string]$ContentType = "application/json",
     [Parameter (Mandatory=$false,ParameterSetName="ConnectionObj")]
       # Pre-populated connection object as returned by Connect-vRNIServer
       [psObject]$Connection
@@ -214,7 +227,7 @@ function Invoke-vRNIRestMethod
 
   # Create a header option dictionary, to be used for authentication (if we have an existing session) and other RESTy stuff
   $headerDict = @{}
-  $headerDict.add("Content-Type", "application/json")
+  $headerDict.add("Content-Type", $ContentType)
 
   # Add the auth token to the headers, if the CSPToken is not filled out
   if($authtoken -ne "") {
@@ -231,13 +244,15 @@ function Invoke-vRNIRestMethod
 
   # Form the URL to call and write in our journal about this call
   $URL = "https://$($Server)$($URI)"
-  Write-Debug "$(Get-Date -format s)  REST Call via Invoke-RestMethod: $Method $URL - with body: $Body"
+  Write-Debug "$(Get-Date -format s)  REST Call via Invoke-RestMethod: $Method $URL "
+  Write-Debug "Headers: $headerDict"
+  Write-Debug "Body: $Body"
 
   # Build up Invoke-RestMethod parameters, can differ per platform
   $invokeRestMethodParams = @{
     "Method" = $Method;
     "Headers" = $headerDict;
-    "ContentType" = "application/json";
+    "ContentType" = $ContentType;
     "Uri" = $URL;
   }
 
@@ -320,6 +335,7 @@ function Invoke-vRNIRestMethod
 
 
   Write-Debug "$(Get-Date -format s) Invoke-RestMethod Result: $response"
+  Write-Debug "$(Get-Date -format s) Invoke-RestMethod Results: $($response.results)"
 
   # Workaround for bug in invoke-restmethod where it doesnt complete the tcp session close to our server after certain calls.
   # We end up with connectionlimit number of tcp sessions in close_wait and future calls die with a timeout failure.
@@ -367,9 +383,14 @@ function Connect-vRNIServer
   with the given local credentials. Returns the connection object, if successful.
 
   .EXAMPLE
-  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password secret -Domain ld.local
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password secret
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
   with the given LDAP credentials. Returns the connection object, if successful.
+
+  .EXAMPLE
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password secret -UseLocalAuth
+  Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
+  with the given LOCAL credentials. Returns the connection object, if successful.
 
   .EXAMPLE
   PS C:\> $MyConnection = Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password secret
@@ -395,9 +416,13 @@ function Connect-vRNIServer
       #PSCredential object containing NSX API authentication credentials
       [PSCredential]$Credential,
     [Parameter (Mandatory=$false)]
-      # Domain to use to login to vRNI (if it's not given, use LOCAL)
+      # Domain to use to login to vRNI - Deprecated, use the full username (something@anything.com) for LDAP auth, and the UseLocalAuth parameter to force local user auth
       [ValidateNotNullOrEmpty()]
-      [string]$Domain = "LOCAL"
+      [string]$Domain = "",
+    [Parameter (Mandatory=$false)]
+      # Are we doing local authentication?
+      [ValidateNotNullOrEmpty()]
+      [switch]$UseLocalAuth
   )
 
   # Make sure either -Credential is set, or both -Username and -Password
@@ -436,18 +461,22 @@ function Connect-vRNIServer
     "password" = $connection_credentials.GetNetworkCredential().Password
   }
 
+  # Figure out if the username is a local or remote username
+  $parts = $Username.split("@")
   # If no domain param is given, use the default LOCAL domain and populate the "domain" field
-  if($Domain -eq "LOCAL") {
+  if($parts[1] -eq "local" -Or $UseLocalAuth -eq $True -Or $Domain -eq "LOCAL")
+  {
     $requestFormat.domain = @{
       "domain_type" = "LOCAL"
       "value" = "local"
     }
   }
   # Otherwise there a LDAP domain requested for credentials
-  else {
+  else
+  {
     $requestFormat.domain = @{
       "domain_type" = "LDAP"
-      "value" = $Domain
+      "value" = $parts[1]
     }
   }
 
@@ -723,7 +752,9 @@ function Get-vRNIDataSource
   Process
   {
     # Bind the parameter to a friendly variable
-    New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
+    if($null -ne $PSBoundParameters.Keys) {
+      New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
+    }
 
     if(!$DataSourceType) {
       $DataSourceType = "all"
@@ -776,26 +807,43 @@ function New-vRNIDataSource
   .EXAMPLE
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
   PS C:\> New-vRNIDataSource -DataSourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password secret -CollectorVMId $collectorId -Nickname vc.nsx.local
+
   First, get the node ID of the collector VM (assuming there's only one), then add a vCenter located at vc.nsx.local to vRNI.
 
   .EXAMPLE
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
   PS C:\> $vcId = (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id)
   PS C:\> New-vRNIDataSource -DataSourceType nsxv -FDQN mgr.nsx.local -Username admin -Password secret -Nickname mgr.nsx.local -CollectorVMId $collectorId -Enabled $True -NSXEnableCentralCLI $True -NSXEnableIPFIX $True -NSXvCenterID $vcId
+
   Adds a new NSX Manager as a data source, auto select the collector ID (if you only have one), enable the NSX Central CLI for collecting data, also enable NSX IPFIX for network datastream insight from the point of view of NSX.
+
+  .EXAMPLE
+  PS C:\> $collectorId = (Get-vRNINodes | Where {$_.ip_address -eq "10.0.0.11"} | Select -ExpandProperty id)
+  PS C:\> New-vRNIDataSource -DataSourceType azure -CollectorVMId $collectorId -Nickname Azure-1 -TenantID xxx-xxx-xxx-xxx-xxx -ApplicationID xxx-xxx-xxx-xxx-xxx -SecretKey secret -SubscriptionID xxx-xxx-xxx-xxx-xxx
+
+  Adds a new Azure subscription; first gets a specific collector appliance based on IP, and continues to add the Azure subscription based on the application registration information.
+  More info on requirements can be found here: https://docs.vmware.com/en/VMware-vRealize-Network-Insight/5.0/com.vmware.vrni.using.doc/GUID-12272E1A-055F-47E9-9EA6-8693FE86AA02.html
+
+  .EXAMPLE
+  PS C:\> $nsxtId      = (Get-vRNIDataSource -DatasourceType nsxt | Where {$_.nickname -eq "my-nsxt-manager"} | Select -ExpandProperty id)
+  PS C:\> $collectorId = (Get-vRNINodes | Where {$_.ip_address -eq "10.0.0.11"} | Select -ExpandProperty id)
+  PS C:\> $kubeconfig  = (Get-Content ~/.kube/config | Out-String)
+  PS C:\> New-vRNIDataSource -DataSourceType kubernetes -Nickname k8s-cluster-1 -CollectorVMId $collectorId -NSXTManagerID $nsxtId -KubeConfig $kubeconfig
+
+  Add a Kubernetes cluster as a data source. First gets the entity ID of the NSX-T Manager supporting the container network, then vRNI Collector ID, then puts the kubeconfig file into a string, and finally adds the Kubernetes cluster to vRNI.
   #>
 
   [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
 
   param (
-    [Parameter (Mandatory=$true)]
+    [Parameter (Mandatory=$false)]
       # Username to use to login to the datasource
       [ValidateNotNullOrEmpty()]
-      [string]$Username,
-    [Parameter (Mandatory=$true)]
+      [string]$Username = "",
+    [Parameter (Mandatory=$false)]
       # Password to use to login to the datasource
       [ValidateNotNullOrEmpty()]
-      [string]$Password,
+      [string]$Password = "",
 
     [Parameter (Mandatory=$false)]
       # The IP address of the datasource
@@ -820,26 +868,32 @@ function New-vRNIDataSource
       # Whether we want to enable the datasource
       [ValidateNotNullOrEmpty()]
       [bool]$Enabled=$True,
+
     [Parameter (Mandatory=$false)]
       # Optional notes for the datasource
       [ValidateNotNullOrEmpty()]
       [string]$Notes="",
 
     # These params are only required when adding a NSX Manager as datasource
-    [Parameter (Mandatory=$true, ParameterSetName="NSXDS")]
+    [Parameter (Mandatory=$False, ParameterSetName="NSXDS")]
       # Enable the central CLI collection
       [ValidateNotNullOrEmpty()]
-      [bool]$NSXEnableCentralCLI,
+      [bool]$NSXEnableCentralCLI = $True,
 
-    [Parameter (Mandatory=$true, ParameterSetName="NSXDS")]
+    [Parameter (Mandatory=$False, ParameterSetName="NSXDS")]
       # Enable NSX IPFIX as a source
       [ValidateNotNullOrEmpty()]
-      [bool]$NSXEnableIPFIX,
+      [bool]$NSXEnableIPFIX = $True,
 
-    [Parameter (Mandatory=$true, ParameterSetName="NSXDS")]
+    [Parameter (Mandatory=$false, ParameterSetName="NSXDS")]
+      # Enable Virtual Latency (VTEP, VNIC, & PNIC) streaming from NSX to vRNI
+      [ValidateNotNullOrEmpty()]
+      [bool]$NSXEnableLatency = $False,
+
+    [Parameter (Mandatory=$False, ParameterSetName="NSXDS")]
       # vCenter ID that this NSX Manager will be linked too
       [ValidateNotNullOrEmpty()]
-      [string]$NSXvCenterID,
+      [string]$NSXvCenterID = "",
 
     # This params is only required when adding a cisco switch
     [Parameter (Mandatory=$true, ParameterSetName="CISCOSWITCH")]
@@ -852,6 +906,37 @@ function New-vRNIDataSource
       # Set the switch type
       [ValidateSet ("FORCE_10_MXL_10", "POWERCONNECT_8024", "S4048", "Z9100", "S6000")]
       [string]$DellSwitchType,
+
+    # These params are only required when adding an Azure subscription as datasource
+    [Parameter (Mandatory=$true, ParameterSetName="AZURE")]
+      # Azure Tenant ID
+      [ValidateNotNullOrEmpty()]
+      [string]$TenantID,
+    [Parameter (Mandatory=$true, ParameterSetName="AZURE")]
+      # Azure Application ID
+      [ValidateNotNullOrEmpty()]
+      [string]$ApplicationID,
+    [Parameter (Mandatory=$true, ParameterSetName="AZURE")]
+      # Azure Secret Key
+      [ValidateNotNullOrEmpty()]
+      [string]$SecretKey,
+    [Parameter (Mandatory=$true, ParameterSetName="AZURE")]
+      # Azure Subscription ID
+      [ValidateNotNullOrEmpty()]
+      [string]$SubscriptionID,
+    [Parameter (Mandatory=$false, ParameterSetName="AZURE")]
+      # Retrieve Flows?
+      [ValidateNotNullOrEmpty()]
+      [bool]$FlowsEnabled = $True,
+
+    [Parameter (Mandatory=$False, ParameterSetName="KUBERNETES")]
+      # KubeConfig as a string
+      [ValidateNotNullOrEmpty()]
+      [string]$KubeConfig,
+    [Parameter (Mandatory=$True, ParameterSetName="KUBERNETES")]
+      # NSX-T Manager entity ID
+      [ValidateNotNullOrEmpty()]
+      [string]$NSXTManagerID,
 
     [Parameter (Mandatory=$False)]
       # vRNI Connection object
@@ -898,10 +983,24 @@ function New-vRNIDataSource
       throw "Please only provide the FDQN or the IP address for the datasource, not both."
     }
 
+    # Require username and password for everything except Azure, K8s, and OpenShift
+    if(($DataSourceType -ne "azure" -And $DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") -And ($Username -eq "" -Or $Password -eq "")) {
+      throw "Please provide the Username and Password parameters as the credentials to connect to the data source."
+    }
+
     # Check if the NSXDS parameter set is used when adding a NSX Manager as datasource
     if($DataSourceType -eq "nsxv" -And $PSCmdlet.ParameterSetName -ne "NSXDS") {
       throw "Please provide the NSX parameters when adding a NSX Manager."
     }
+    if($DataSourceType -eq "nsxv" -And $NSXvCenterID -eq "") {
+      throw "Please provide the NSXvCenterID parameter when adding a NSX-v Manager."
+    }
+
+    # Check if the KUBERNETES parameter set is used when adding K8s or OpenShift as datasource
+    if(($DataSourceType -eq "kubernetes" -Or $DataSourceType -eq "openshift" -Or $DataSourceType -eq "pks") -And $PSCmdlet.ParameterSetName -ne "KUBERNETES") {
+      throw "Please provide the KubeConfig and NSXTManagerID parameters when adding an OpenShift or Kubernetes data source. PKS only needs the NSXTManagerID"
+    }
+
 
     # Check if the switch type is provided, when adding a Cisco of Dell switch
     if($DataSourceType -eq "ciscoswitch" -And $PSCmdlet.ParameterSetName -ne "CISCOSWITCH") {
@@ -909,6 +1008,9 @@ function New-vRNIDataSource
     }
     if($DataSourceType -eq "dellswitch" -And $PSCmdlet.ParameterSetName -ne "DELLSWITCH") {
       throw "Please provide the -DellSwitchType parameter when adding a Dell switch."
+    }
+    if($DataSourceType -eq "azure" -And $PSCmdlet.ParameterSetName -ne "AZURE") {
+      throw "Please provide the TenantID, ApplicationID, SecretKey, and SubscriptionID parameters when adding an Azure subscription."
     }
 
     # Format request with all given data
@@ -919,17 +1021,42 @@ function New-vRNIDataSource
       "nickname" = $Nickname
       "notes" = $Notes
       "enabled" = $Enabled
-      "credentials" = @{
+    }
+
+    # For any other data source than a generic (UANI) switch, K8s or OpenShift, use regular credentials
+    if($DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") {
+      $requestFormat.credentials = @{
         "username" = $Username
         "password" = $Password
       }
     }
+    else
+    {
+      if($DataSourceType -eq "kubernetes" -Or $DataSourceType -ne "openshift")
+      {
+        # Add KubeConfig and NSX-T Manager entity ID for OpenShift or K8s
+        $requestFormat.manager_id = $NSXTManagerID
+        $requestFormat.credentials = @{
+          "kubeconfig" = $KubeConfig
+        }
+      }
+    }
+    if($DataSourceType -eq "pks") {
+      # Add NSX-T Manager entity ID for PKS
+      $requestFormat.manager_id = $NSXTManagerID
+    }
 
     # If we're adding a NSX Manager, also add the NSX parameters to the body
-    if($PSCmdlet.ParameterSetName -eq "NSXDS") {
+    if($DataSourceType -eq "nsxv") {
       $requestFormat.vcenter_id = $NSXvCenterID
       $requestFormat.ipfix_enabled = $NSXEnableIPFIX
       $requestFormat.central_cli_enabled = $NSXEnableCentralCLI
+      $requestFormat.latency_enabled = $NSXEnableLatency
+    }
+
+    if($DataSourceType -eq "nsxt") {
+      $requestFormat.ipfix_enabled = $NSXEnableIPFIX
+      $requestFormat.latency_enabled = $NSXEnableLatency
     }
 
     # When adding a Cisco or Dell switch, provide the switch_type key in the body
@@ -938,6 +1065,17 @@ function New-vRNIDataSource
     }
     if($DataSourceType -eq "dellswitch") {
       $requestFormat.switch_type = $DellSwitchType
+    }
+
+    # Add the application registration details for Azure subscriptions
+    if($DataSourceType -eq "azure") {
+      $requestFormat.flows_enabled = $FlowsEnabled
+      $requestFormat.credentials = @{
+        "azure_client" = $ApplicationID
+        "azure_key" = $SecretKey
+        "azure_tenant" = $TenantID
+        "azure_subscription" = $SubscriptionID
+      }
     }
 
     # Convert the hash to JSON, form the URI and send the request to vRNI
@@ -992,6 +1130,224 @@ function Remove-vRNIDataSource
       $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)"
 
       Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri $URI
+    } ## end Foreach-Object
+  } ## end process
+}
+
+
+function Update-vRNIDataSource
+{
+  <#
+  .SYNOPSIS
+  Updates the configuration of a datasource from vRealize Network Insight
+
+  .DESCRIPTION
+  Datasources within vRealize Network Insight provide the data shown in
+  the UI. The vRNI Collectors periodically polls the datasources as the
+  source of truth. Typically you have a vCenter, NSX Manager and physical
+  switches as the datasource.
+
+  This cmdlet updates a datasources in vRNI.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Update-vRNIDataSource -Username admin -Password 'VMware1!'
+  Updates the credentials of a vCenter datasource with the nickname "vc.nsx.local"
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "manager.nsx.local"} | Update-vRNIDataSource -Nickname "newnickname"
+  Updates the nickname of a NSX Manager datasource with the nickname "manager.nsx.local"
+  #>
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNIDataSource
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$DataSource,
+
+    [Parameter (Mandatory=$false)]
+      # Nickname for the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$Nickname="",
+
+    [Parameter (Mandatory=$false)]
+      # Username to use to login to the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$Username = "",
+
+    [Parameter (Mandatory=$false)]
+      # Password to use to login to the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$Password = "",
+
+    [Parameter (Mandatory=$false)]
+      # Optional notes for the datasource
+      [ValidateNotNullOrEmpty()]
+      [string]$Notes="",
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+
+    if ($Nickname -eq "" -And $Username -eq "" -And $Password -eq "" -And $Notes -eq "") {
+      throw "Provide at least one parameter to update!"
+    }
+
+    $DataSource | Foreach-Object {
+      $oThisDatasource = $_
+
+      # All we have to do is to send a PUT request to URI /api/ni/$DataSourceType/$DatasourceId,
+      # with the modified options
+      if ($Nickname -ne "") {
+        $oThisDatasource.nickname = $Nickname
+      }
+      if ($Username -ne "") {
+        $oThisDatasource.credentials.username = $Username
+
+      }
+      if ($Password -ne "") {
+        $oThisDatasource.credentials.password = $Password
+      }
+      if ($Notes -ne "") {
+        if($null -eq $oThisDatasource.notes) {
+          $oThisDatasource | Add-Member -MemberType NoteProperty -Name 'notes' -Value $Notes
+        }
+        else {
+          $oThisDatasource.notes = $Notes
+        }
+      }
+
+      $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)"
+      $requestBody = ConvertTo-Json $oThisDatasource
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method PUT -Uri $URI -Body $requestBody
+    } ## end Foreach-Object
+  } ## end process
+}
+
+
+function Update-vRNINSXvControllerClusterPassword
+{
+  <#
+  .SYNOPSIS
+  Updates the NSX-v Controller Cluster password and enabled data collection. Needed for routing information on NSX-v.
+
+  .DESCRIPTION
+  The NSX for vSphere Controller Cluster contains the routing information of the virtual network. These controllers have separate passwords, and vRNI needs that password in order to collect data.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource -DatasourceType nsxv | Update-vRNINSXvControllerClusterPassword -Password 'secret'
+  Gets all NSX-v data sources and sets the controller cluster password for each of them.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource -DatasourceType nsxv | Update-vRNINSXvControllerClusterPassword -Password 'secret' -Enabled $False
+  Gets all NSX-v data sources and disables controller cluster data collection.
+  #>
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNIDataSource
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$DataSource,
+
+    [Parameter (Mandatory=$True)]
+      # Controller Cluster Password
+      [ValidateNotNullOrEmpty()]
+      [string]$Password,
+
+    [Parameter (Mandatory=$False)]
+      # Enable data collection from
+      [ValidateNotNullOrEmpty()]
+      [bool]$Enabled = $True,
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+
+    $DataSource | Foreach-Object {
+      $oThisDatasource = $_
+
+      if($oThisDatasource.entity_type -ne "NSXVManagerDataSource") {
+        throw "Given data source is not a NSX-v data source! $($oThisDatasource)"
+      }
+
+      $requestFormat = @{
+        "enabled" = $Enabled
+        "controller_password" = $Password
+      }
+
+      $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)/controller-cluster"
+      $requestBody = ConvertTo-Json $requestFormat
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method PUT -Uri $URI -Body $requestBody
+    } ## end Foreach-Object
+  } ## end process
+}
+
+function Update-vRNIDataSourceData
+{
+  <#
+  .SYNOPSIS
+  Updates the user-assisted-networking-information data (zip file) of a generic switch or router datasource
+
+  .DESCRIPTION
+  Generic switch or router devices backed by UANI, take a zipfile with with a set of CSV files containing the information of the device.
+  This cmdlet updates the data source inside vRNI and uploads the zipfile to do so.
+
+  More info: https://github.com/vmware/network-insight-sdk-generic-datasources
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "generic-switch"} | Update-vRNIDataSourceData -Zipfile 'c:\uani-zipfile-17-11-2019.zip'
+  Updates the generic data source information with the info from the zipfile
+  #>
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNIDataSource
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$DataSource,
+
+    [Parameter (Mandatory=$True)]
+      # The zipfile with the contents for UANI
+      [ValidateNotNullOrEmpty()]
+      [string]$Zipfile,
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+
+    $DataSource | Foreach-Object {
+      $oThisDatasource = $_
+
+      $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)/data"
+
+      $fileName     = Split-Path $Zipfile -leaf
+      $zipContents  = [IO.File]::ReadAllBytes($Zipfile)
+      $usedEncoding = [System.Text.Encoding]::GetEncoding("ISO-8859-1")
+      $fileEncoding = $usedEncoding.GetString($zipContents)
+      $boundary     = [System.Guid]::NewGuid().ToString();
+      $LF = "`r`n";
+
+      $requestBody = (
+        "--$boundary",
+        "Content-Disposition: form-data; name=`"file`"; filename=`"$($fileName)`"",
+        "Content-Type: application/octet-stream$LF",
+        $fileEncoding,
+        "--$boundary--$LF"
+      ) -join $LF
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method PUT -Uri $URI -Body $requestBody -ContentType "multipart/form-data; boundary=`"$boundary`""
     } ## end Foreach-Object
   } ## end process
 }
@@ -1128,7 +1484,8 @@ function Get-vRNIDataSourceSNMPConfig
       if($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "BrocadeSwitchDataSource" -And $oThisDatasource.entity_type -ne "JuniperSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource" -And
-        $oThisDatasource.entity_type -ne "CiscoACIDataSource" -And $oThisDatasource.entity_type -ne "GDDataSource")
+        $oThisDatasource.entity_type -ne "CiscoACIDataSource" -And $oThisDatasource.entity_type -ne "HuaweiSwitchDataSource" -And
+        $oThisDatasource.entity_type -ne "F5BIGIPDataSource")
       {
         throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, Arista, F5, Huawei & UCS have SNMP configuration."
       }
@@ -1172,7 +1529,7 @@ function Set-vRNIDataSourceSNMPConfig
       [ValidateNotNullOrEmpty()]
       [PSObject]$DataSource,
 
-    [Parameter (Mandatory=$false, ParameterSetName="SNMPv2c")]
+    [Parameter (Mandatory=$false)]
       # Enable SNMP?
       [ValidateNotNullOrEmpty()]
       [bool]$Enabled = $true,
@@ -1223,8 +1580,9 @@ function Set-vRNIDataSourceSNMPConfig
 
       if($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "BrocadeSwitchDataSource" -And $oThisDatasource.entity_type -ne "JuniperSwitchDataSource" -And
-        $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource") {
-        throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP configuration."
+        $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource" -And
+        $oThisDatasource.entity_type -ne "F5BIGIPDataSource" -And $oThisDatasource.entity_type -ne "HuaweiSwitchDataSource") {
+        throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, F5, Arista switches & UCS have SNMP configuration."
       }
 
       # Format request with all given data
@@ -1825,8 +2183,6 @@ function Get-vRNIEntity
         filter = "Name = '$Name'"
       } | ConvertTo-Json
       $listParams['Method'] = 'POST'
-
-      $finished = $true
     }
 
     # Get a list of all entities
@@ -1862,12 +2218,6 @@ function Get-vRNIEntity
         }
 
         $entities.Add($entity) | Out-Null
-
-        if($Name -eq $entity.name) {
-          $finished = $true
-          break
-        }
-
         $current_count++
 
         # If we are limiting the output, break from the loops and return results
@@ -1898,12 +2248,6 @@ function Get-vRNIEntity
       }
 
       $entities.Add($entity_info) | Out-Null
-
-      if($Name -eq $entity_info.name) {
-        $finished = $true
-        break
-      }
-
       $current_count++
 
       # If we are limiting the output, break from the loops and return results
@@ -2064,6 +2408,43 @@ function Get-vRNIFlow
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
   $results = Get-vRNIEntity -Entity_URI "flows" -Limit $Limit -StartTime $StartTime -EndTime $EndTime
+  $results
+}
+
+
+function Get-vRNIKubernetesServices
+{
+  <#
+  .SYNOPSIS
+  Get Kubernetes Services from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all Kubernetes Services in your environment
+  and this cmdlet will help you discover these services.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIKubernetesServices
+  List all Kubernetes Services in your vRNI environment (note: this may take a while if you have a lot of services)
+
+  .EXAMPLE
+  PS C:\> Get-vRNIKubernetesServices -Name my-k8s-service
+  Retrieve only the Kubernetes Service object called "my-k8s-service"
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Limit the amount of records returned
+      [int]$Limit = 0,
+    [Parameter (Mandatory=$false, Position=1)]
+      # Limit the amount of records returned
+      [string]$Name = "",
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "kubernetes-services" -Name $Name -Limit $Limit
   $results
 }
 
@@ -3745,6 +4126,100 @@ function Set-vRNISettingsUser
     Connection = $Connection
     Method = 'POST'
     Uri = "/api/ni/settings/users/vidm"
+    Body = $body | ConvertTo-Json
+  }
+
+  $result = Invoke-vRNIRestMethod @listParams
+  $result
+}
+
+
+function Set-vRNIUserPassword
+{
+  <#
+  .SYNOPSIS
+  Change the password of a local user to Network Insight
+
+  .DESCRIPTION
+  Local users have a password configured inside Network Insight.
+  This cmdlet allows admins to set passwords of existing users, and
+  allow member to set their own passwords.
+
+  .EXAMPLE
+  PS C:\> Set-vRNIUserPassword -Username admin@local -NewPassword 'mynewpassword'
+
+  .EXAMPLE
+  PS C:\> Set-vRNIUserPassword -Username admin@local
+  PowerShell credential request
+  Input the new password
+  Password for user test@local.corp: ********
+
+  .EXAMPLE
+  PS C:\> $new_cred = Get-Credential
+
+  PowerShell credential request
+  Enter your credentials.
+  User: test@local.corp
+  Password for user test@local.corp: ***********
+  PS C:\>  Set-vRNIUserPassword -Credentials $new_cred
+  #>
+  param (
+    [Parameter (Mandatory=$false)]
+      # Username in 'admin@local' format
+      [string]$Username,
+    [Parameter (Mandatory=$false)]
+      # Their new password
+      [string]$NewPassword,
+    [Parameter (Mandatory=$false)]
+      # PSCredential object containing credentials to update
+      [PSCredential]$Credential,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  # Make sure either -Credential is set, or both -Username and -Password
+  if(($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Username")) -Or
+     ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("NewPassword")))
+  {
+    throw "Specify either -Credential or -Username to pass the new password (if using -Username and omitting -NewPassword, a prompt will be given)"
+  }
+
+  # Build cred object for default auth if user specified username/pass
+  $user_credentials = ""
+  if($PsBoundParameters.ContainsKey("Username"))
+  {
+    # Is the -Password omitted? Prompt securely
+    if(!$PsBoundParameters.ContainsKey("NewPassword")) {
+      $user_credentials = Get-Credential -UserName $Username -Message "Input the new password"
+    }
+    # If the password has been given in cleartext,
+    else {
+      $user_credentials = New-Object System.Management.Automation.PSCredential($Username, $(ConvertTo-SecureString $NewPassword -AsPlainText -Force))
+    }
+  }
+  # If a credential object was given as a parameter, use that
+  elseif($PSBoundParameters.ContainsKey("Credential"))
+  {
+    $user_credentials = $Credential
+  }
+  # If no -Username or -Credential was given, prompt for credentials
+  elseif(!$PSBoundParameters.ContainsKey("Credential")) {
+    $user_credentials = Get-Credential -Message "Input the username and new password"
+  }
+
+  # Initialise the body
+  $body = @{
+    "username" = $user_credentials.Username
+    "new_password" = $user_credentials.GetNetworkCredential().Password
+  }
+
+  # Initialise the RestMethod params
+  $listParams = @{
+    Connection = $Connection
+    Method = 'PUT'
+    Uri = "/api/ni/settings/users/password"
     Body = $body | ConvertTo-Json
   }
 
