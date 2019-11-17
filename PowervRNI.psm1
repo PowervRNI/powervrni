@@ -411,9 +411,13 @@ function Connect-vRNIServer
       #PSCredential object containing NSX API authentication credentials
       [PSCredential]$Credential,
     [Parameter (Mandatory=$false)]
-      # Domain to use to login to vRNI (if it's not given, use LOCAL)
+      # Domain to use to login to vRNI - Deprecated, use the full username (something@anything.com) for LDAP auth, and the UseLocalAuth parameter to force local user auth
       [ValidateNotNullOrEmpty()]
-      [string]$Domain = "LOCAL"
+      [string]$Domain = "",
+    [Parameter (Mandatory=$false)]
+      # Are we doing local authentication?
+      [ValidateNotNullOrEmpty()]
+      [switch]$UseLocalAuth
   )
 
   # Make sure either -Credential is set, or both -Username and -Password
@@ -452,18 +456,22 @@ function Connect-vRNIServer
     "password" = $connection_credentials.GetNetworkCredential().Password
   }
 
+  # Figure out if the username is a local or remote username
+  $parts = $Username.split("@")
   # If no domain param is given, use the default LOCAL domain and populate the "domain" field
-  if($Domain -eq "LOCAL") {
+  if($parts[1] -eq "local" -Or $UseLocalAuth -eq $True -Or $Domain -eq "LOCAL")
+  {
     $requestFormat.domain = @{
       "domain_type" = "LOCAL"
       "value" = "local"
     }
   }
   # Otherwise there a LDAP domain requested for credentials
-  else {
+  else
+  {
     $requestFormat.domain = @{
       "domain_type" = "LDAP"
-      "value" = $Domain
+      "value" = $parts[1]
     }
   }
 
