@@ -189,6 +189,10 @@ function Invoke-vRNIRestMethod
     [Parameter (ParameterSetName="ConnectionObj")]
       # Save content to file
       [string]$OutFile = "",
+    [Parameter (Mandatory=$false,ParameterSetName="Parameter")]
+    [Parameter (ParameterSetName="ConnectionObj")]
+        # Override Content-Type
+        [string]$ContentType = "application/json",
     [Parameter (Mandatory=$false,ParameterSetName="ConnectionObj")]
       # Pre-populated connection object as returned by Connect-vRNIServer
       [psObject]$Connection
@@ -223,7 +227,7 @@ function Invoke-vRNIRestMethod
 
   # Create a header option dictionary, to be used for authentication (if we have an existing session) and other RESTy stuff
   $headerDict = @{}
-  $headerDict.add("Content-Type", "application/json")
+  $headerDict.add("Content-Type", $ContentType)
 
   # Add the auth token to the headers, if the CSPToken is not filled out
   if($authtoken -ne "") {
@@ -240,13 +244,15 @@ function Invoke-vRNIRestMethod
 
   # Form the URL to call and write in our journal about this call
   $URL = "https://$($Server)$($URI)"
-  Write-Debug "$(Get-Date -format s)  REST Call via Invoke-RestMethod: $Method $URL - with body: $Body"
+  Write-Debug "$(Get-Date -format s)  REST Call via Invoke-RestMethod: $Method $URL "
+  Write-Debug "Headers: $headerDict"
+  Write-Debug "Body: $Body"
 
   # Build up Invoke-RestMethod parameters, can differ per platform
   $invokeRestMethodParams = @{
     "Method" = $Method;
     "Headers" = $headerDict;
-    "ContentType" = "application/json";
+    "ContentType" = $ContentType;
     "Uri" = $URL;
   }
 
@@ -1205,6 +1211,68 @@ function Update-vRNIDataSource
       $requestBody = ConvertTo-Json $oThisDatasource
 
       Invoke-vRNIRestMethod -Connection $Connection -Method PUT -Uri $URI -Body $requestBody
+    } ## end Foreach-Object
+  } ## end process
+}
+
+
+function Update-vRNIDataSourceData
+{
+  <#
+  .SYNOPSIS
+  Updates the user-assisted-networking-information data (zip file) of a generic switch or router datasource
+
+  .DESCRIPTION
+  Generic switch or router devices backed by UANI, take a zipfile with with a set of CSV files containing the information of the device.
+  This cmdlet updates the data source inside vRNI and uploads the zipfile to do so.
+
+  More info: https://github.com/vmware/network-insight-sdk-generic-datasources
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "generic-switch"} | Update-vRNIDataSourceData -Zipfile 'c:\uani-zipfile-17-11-2019.zip'
+  Updates the generic data source information with the info from the zipfile
+  #>
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNIDataSource
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$DataSource,
+
+    [Parameter (Mandatory=$True)]
+      # The zipfile with the contents for UANI
+      [ValidateNotNullOrEmpty()]
+      [string]$Zipfile,
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+
+    $DataSource | Foreach-Object {
+      $oThisDatasource = $_
+
+      $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)/data"
+
+      $fileName     = Split-Path $Zipfile -leaf
+      $zipContents  = [IO.File]::ReadAllBytes($Zipfile)
+      $usedEncoding = [System.Text.Encoding]::GetEncoding("ISO-8859-1")
+      $fileEncoding = $usedEncoding.GetString($zipContents)
+      $boundary     = [System.Guid]::NewGuid().ToString();
+      $LF = "`r`n";
+
+      $requestBody = (
+        "--$boundary",
+        "Content-Disposition: form-data; name=`"file`"; filename=`"$($fileName)`"",
+        "Content-Type: application/octet-stream$LF",
+        $fileEncoding,
+        "--$boundary--$LF"
+      ) -join $LF
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method PUT -Uri $URI -Body $requestBody -ContentType "multipart/form-data; boundary=`"$boundary`""
     } ## end Foreach-Object
   } ## end process
 }
