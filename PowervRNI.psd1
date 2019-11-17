@@ -12,7 +12,7 @@
 RootModule = 'PowervRNI.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.6.93'
+ModuleVersion = '1.7.112'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
