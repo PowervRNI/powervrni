@@ -1224,6 +1224,68 @@ function Update-vRNIDataSource
 }
 
 
+function Update-vRNINSXvControllerClusterPassword
+{
+  <#
+  .SYNOPSIS
+  Updates the NSX-v Controller Cluster password and enabled data collection. Needed for routing information on NSX-v.
+
+  .DESCRIPTION
+  The NSX for vSphere Controller Cluster contains the routing information of the virtual network. These controllers have separate passwords, and vRNI needs that password in order to collect data.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource -DatasourceType nsxv | Update-vRNINSXvControllerClusterPassword -Password 'secret'
+  Gets all NSX-v data sources and sets the controller cluster password for each of them.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDataSource -DatasourceType nsxv | Update-vRNINSXvControllerClusterPassword -Password 'secret' -Enabled $False
+  Gets all NSX-v data sources and disables controller cluster data collection.
+  #>
+
+  param (
+    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
+      # Datasource object, gotten from Get-vRNIDataSource
+      [ValidateNotNullOrEmpty()]
+      [PSObject]$DataSource,
+
+    [Parameter (Mandatory=$True)]
+      # Controller Cluster Password
+      [ValidateNotNullOrEmpty()]
+      [string]$Password,
+
+    [Parameter (Mandatory=$False)]
+      # Enable data collection from
+      [ValidateNotNullOrEmpty()]
+      [bool]$Enabled = $True,
+
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  process {
+
+    $DataSource | Foreach-Object {
+      $oThisDatasource = $_
+
+      if($oThisDatasource.entity_type -ne "NSXVManagerDataSource") {
+        throw "Given data source is not a NSX-v data source! $($oThisDatasource)"
+      }
+
+      $requestFormat = @{
+        "enabled" = $Enabled
+        "controller_password" = $Password
+      }
+
+      $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)/controller-cluster"
+      $requestBody = ConvertTo-Json $requestFormat
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method PUT -Uri $URI -Body $requestBody
+    } ## end Foreach-Object
+  } ## end process
+}
+
 function Update-vRNIDataSourceData
 {
   <#

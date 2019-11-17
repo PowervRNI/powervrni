@@ -93,10 +93,10 @@ FunctionsToExport = 'Connect-vRNIServer', 'Connect-NIServer', 'Disable-vRNIDataS
                'Remove-vRNINorthSouthIP', 'Get-vRNISettingsVIDM',
                'Set-vRNISettingsVIDM', 'Get-vRNISettingsUserGroup',
                'Set-vRNISettingsUserGroup', 'Remove-vRNISettingsUserGroup',
-               'Get-vRNISettingsUser', 'Set-vRNISettingsUser',
-               'Remove-vRNISettingsUser', 'Get-vRNIAuditLogs',
+               'Get-vRNISettingsUser', 'Set-vRNISettingsUser','Remove-vRNISettingsUser', 'Get-vRNIAuditLogs',
                'Get-vRNIApplicationMemberVM', 'Set-vRNIUserPassword',
-               'Get-vRNIKubernetesServices'
+               'Get-vRNIKubernetesServices', 'Update-vRNIDataSourceData',
+               'Update-vRNINSXvControllerClusterPassword'
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = '*'
