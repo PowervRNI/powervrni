@@ -2211,11 +2211,11 @@ function Get-vRNIEntity
 
       foreach($entity in $entity_info.results)
       {
-        $entity = $entity.entity
         # If we're retrieving flows, add the time of the main flow to this specific flow record
         if($Entity_URI -eq "flows") {
-          $entity | Add-Member -Name "time" -value $entity.time -MemberType NoteProperty
+          $entity.entity | Add-Member -Name "time" -value $entity.time -MemberType NoteProperty
         }
+        $entity = $entity.entity
 
         $entities.Add($entity) | Out-Null
         $current_count++
