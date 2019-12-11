@@ -1024,6 +1024,11 @@ function New-vRNIDataSource
       "enabled" = $Enabled
     }
 
+    # ServiceNow uses instance_id as the FQDN
+    if($DataSourceType -eq "servicenow") {
+      $requestFormat.instance_id = $FDQN
+    }
+
     # For any other data source than a generic (UANI) switch, K8s or OpenShift, use regular credentials
     if($DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") {
       $requestFormat.credentials = @{
