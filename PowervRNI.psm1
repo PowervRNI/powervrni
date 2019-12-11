@@ -1027,6 +1027,7 @@ function New-vRNIDataSource
     # ServiceNow uses instance_id as the FQDN
     if($DataSourceType -eq "servicenow") {
       $requestFormat.instance_id = $FDQN
+      $requestFormat.is_graph_config_customized = "false" # TODO: support customised relation graphs
     }
 
     # For any other data source than a generic (UANI) switch, K8s or OpenShift, use regular credentials
