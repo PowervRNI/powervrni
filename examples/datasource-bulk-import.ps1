@@ -21,7 +21,7 @@ if (!(Test-Path $DatasourcesCSV)) {
 }
 
 # Look up collector ID. This assumes you only have 1 collector in play
-$collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM" -And $_.ip_address -eq "10.8.20.22"} | Select -ExpandProperty id)
+$collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
 
 # Read the CSV into memory (using delimiter ';' so you can use Excel to modify it)
 $csvList = Import-CSV $DatasourcesCSV -Delimiter ';'
@@ -32,7 +32,7 @@ foreach($csvLine in $csvList)
 
   Write-Host "[$(Get-Date)] Adding a $($csvLine.DatasourceType) Data Source with IP $($csvLine.IP).." -ForegroundColor "green"
 
-  # Build up the params we're going to give to New-vRNIDataSource 
+  # Build up the params we're going to give to New-vRNIDataSource
   $cmdParams = @{
     "DataSourceType" = $csvLine.DatasourceType;
     "Username" = $csvLine.Username;
@@ -43,7 +43,7 @@ foreach($csvLine in $csvList)
   }
 
   # sort out NSX-V specific parameters
-  if($csvLine.DatasourceType -eq "nsxv") 
+  if($csvLine.DatasourceType -eq "nsxv")
   {
     if($csvLine.NSX_ENABLE_CENTRAL_CLI -eq "TRUE") {
       $cmdParams.Add("NSXEnableCentralCLI", $True)
@@ -64,40 +64,55 @@ foreach($csvLine in $csvList)
   }
 
   # add a -CiscoSwitchType param when the datasource type is a cisco switch
-  if($csvLine.DatasourceType -eq "ciscoswitch") 
+  if($csvLine.DatasourceType -eq "ciscoswitch")
   {
     # Sanity check on the input
-    if(($csvLine.CISCO_SWITCHTYPE -eq "CATALYST_3000") -Or 
-       ($csvLine.CISCO_SWITCHTYPE -eq "CATALYST_4500") -Or 
-       ($csvLine.CISCO_SWITCHTYPE -eq "CATALYST_6500") -Or 
-       ($csvLine.CISCO_SWITCHTYPE -eq "NEXUS_5K") -Or 
-       ($csvLine.CISCO_SWITCHTYPE -eq "NEXUS_7K") -Or 
-       ($csvLine.CISCO_SWITCHTYPE -eq "NEXUS_9K")) 
+    if(($csvLine.CISCO_SWITCHTYPE -eq "CATALYST_3000") -Or
+       ($csvLine.CISCO_SWITCHTYPE -eq "CATALYST_4500") -Or
+       ($csvLine.CISCO_SWITCHTYPE -eq "CATALYST_6500") -Or
+       ($csvLine.CISCO_SWITCHTYPE -eq "NEXUS_5K") -Or
+       ($csvLine.CISCO_SWITCHTYPE -eq "NEXUS_7K") -Or
+       ($csvLine.CISCO_SWITCHTYPE -eq "NEXUS_9K"))
     {
       $cmdParams.Add("CiscoSwitchType", $csvLine.CISCO_SWITCHTYPE)
     }
     else {
       Write-Host "[$(Get-Date)] Invalid CISCO_SWITCHTYPE ($($csvLine.CISCO_SWITCHTYPE)) given on line $($csvLineNo), skipping.." -ForegroundColor "yellow"
-    }    
+    }
   }
 
   # add a -DellSwitchType param when the datasource type is a dell switch
-  if($csvLine.DatasourceType -eq "dellswitch") 
+  if($csvLine.DatasourceType -eq "dellswitch")
   {
     # Sanity check on the input
-    if(($csvLine.DELL_SWITCHTYPE -eq "FORCE_10_MXL_10") -Or 
-       ($csvLine.DELL_SWITCHTYPE -eq "POWERCONNECT_8024") -Or 
-       ($csvLine.DELL_SWITCHTYPE -eq "S4048") -Or 
-       ($csvLine.DELL_SWITCHTYPE -eq "Z9100") -Or 
-       ($csvLine.DELL_SWITCHTYPE -eq "S6000")) 
+    if(($csvLine.DELL_SWITCHTYPE -eq "FORCE_10_MXL_10") -Or
+       ($csvLine.DELL_SWITCHTYPE -eq "POWERCONNECT_8024") -Or
+       ($csvLine.DELL_SWITCHTYPE -eq "S4048") -Or
+       ($csvLine.DELL_SWITCHTYPE -eq "Z9100") -Or
+       ($csvLine.DELL_SWITCHTYPE -eq "S6000"))
     {
       $cmdParams.Add("DellSwitchType", $csvLine.DELL_SWITCHTYPE)
     }
     else {
       Write-Host "[$(Get-Date)] Invalid DELL_SWITCHTYPE ($($csvLine.DELL_SWITCHTYPE)) given on line $($csvLineNo), skipping.." -ForegroundColor "yellow"
-    }    
+    }
   }
 
   # Execute!
-  New-vRNIDataSource @cmdParams
+  $newDs = New-vRNIDataSource @cmdParams
+
+
+  # Set SNMP community after adding - just SNMP v2c support right now
+  if($csvLine.SnmpCommunity -ne "" -And ($csvLine.DataSourceType -eq "ciscoswitch" -Or $csvLine.DataSourceType -eq "aristaswitch" -Or $csvLine.DataSourceType -eq "dellos10switch" -Or $csvLine.DataSourceType -eq "ciscoucs"))
+  {
+    try {
+      ($newDs | Set-vRNIDataSourceSNMPConfig -Enabled $true -Community $csvLine.SnmpCommunity | Out-Null)
+    }
+    catch {
+      Write-Host "Unable to add snmp config to:"
+      $newDs
+      Write-Host "Exception:"
+      $_.Exception
+    }
+  }
 }
