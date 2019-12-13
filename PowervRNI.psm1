@@ -753,7 +753,7 @@ function Get-vRNIDataSource
   Process
   {
     # Bind the parameter to a friendly variable
-    if($null -ne $PSBoundParameters.Keys) {
+    if($PSBoundParameters.ContainsKey("DataSourceType")) {
       New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
     }
 
