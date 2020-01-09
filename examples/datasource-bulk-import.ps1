@@ -99,7 +99,19 @@ foreach($csvLine in $csvList)
   }
 
   # Execute!
-  $newDs = New-vRNIDataSource @cmdParams
+  try {
+    $newDs = New-vRNIDataSource @cmdParams
+  }
+  catch
+  {
+    # If 1 data source addition fails because the data source itself times out or is unavailable, make a note and move on to the next data source
+    Write-Host "[$(Get-Date)] Unable to add data source with parameters:" -ForegroundColor "red"
+    $cmdParams
+    Write-Host "[$(Get-Date)] Exception:" -ForegroundColor "red"
+    $_.Exception
+    # Don't even bother with SNMP, continue to the next data source
+    continue
+  }
 
 
   # Set SNMP community after adding - just SNMP v2c support right now
