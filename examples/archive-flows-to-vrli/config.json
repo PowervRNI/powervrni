@@ -1,0 +1,8 @@
+{
+  "vrni_server": "my-vrni-platform.lab",
+  "vrni_credentials_file": "credentials.xml",
+  "vrni_domain": "local",
+  "vrli_server": "my-vrli-server",
+  "cache_file": "flow-cache.json",
+  "last_flows_ts": 1579273407
+}

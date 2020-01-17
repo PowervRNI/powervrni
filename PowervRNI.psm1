@@ -2251,7 +2251,7 @@ function Get-vRNIEntity
 
       # If we're retrieving flows, add the time of the main flow to this specific flow record
       if($Entity_URI -eq "flows") {
-        $entity_info | Add-Member -Name "time" -value $entity_info.time -MemberType NoteProperty
+        $entity_info | Add-Member -Name "time" -value $sg.time -MemberType NoteProperty
       }
 
       $entities.Add($entity_info) | Out-Null
