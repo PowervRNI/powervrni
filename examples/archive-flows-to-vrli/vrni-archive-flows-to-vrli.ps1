@@ -114,7 +114,13 @@ foreach($flow in $raw_flows)
         $flows += $flow
     }
 
-    $new_flow_cache.Add($key_name, $new_flow_ts)
+    # update new cache
+    if($new_flow_cache.ContainsKey($key_name)) {
+        $flow_cache[$key_name] = $new_flow_ts
+    }
+    else {
+        $new_flow_cache.Add($key_name, $new_flow_ts)
+    }
 }
 
 # Write new cache file
