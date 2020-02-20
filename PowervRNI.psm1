@@ -2311,6 +2311,54 @@ function Get-vRNIEntityName
   $result
 }
 
+function Get-vRNIEntityNames
+{
+  <#
+  .SYNOPSIS
+  Translate an array of entity ids to names in vRealize Network Insight.
+
+  .DESCRIPTION
+  The internal database of vRealize Network Insight uses entity IDs
+  to keep track of entities. This function translates an ID to an
+  actual useable name.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIEntityNames -EntityID 14307:562:1274720802,14307:562:1274720803 -EntityType VirtualMachine
+  Get the name of the entity with ID 14307:562:1274720802 and 14307:562:1274720803
+  #>
+  param (
+    [Parameter (Mandatory=$true, Position=1)]
+      # The entity IDs to resolve to a name
+      [string[]]$EntityIDs,
+    [Parameter (Mandatory=$true, Position=2)]
+      # The entity type to resolve to a name
+      [string[]]$EntityType,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $requestFormat = @{
+    "entity_ids" = @()
+  }
+
+  foreach($entityID in $EntityIDs)
+  {
+    $record = @{
+      "entity_id" = $entityID
+      "entity_type" = $EntityType
+    }
+
+    $requestFormat.entity_ids += $record
+  }
+
+  $requestBody = ConvertTo-Json $requestFormat
+  $entity_info = Invoke-vRNIRestMethod -Connection $Connection -Method POST -URI "/api/ni/entities/fetch" -Body $requestBody
+
+  $entity_info.results
+}
+
 function Get-vRNIProblem
 {
   <#
