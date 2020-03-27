@@ -38,7 +38,7 @@ $Manifest_Common.Add("ModuleVersion", $PowervRNI_Version)
 $currentPath = split-path $MyInvocation.MyCommand.Path
 
 # Generate new manifest file
-New-ModuleManifest -Path "$currentPath/../PowervRNI.psd1" -PowerShellVersion '3.0' @Manifest_Common
+New-ModuleManifest -Path "$currentPath/../PowervRNI.psd1" -PowerShellVersion '6.0' @Manifest_Common
 # Convert to UTF8
 $content = Get-Content "$currentPath/../PowervRNI.psd1"
 [System.IO.File]::WriteAllLines("$currentPath/../PowervRNI.psd1", $content)
