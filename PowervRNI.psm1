@@ -5,7 +5,7 @@
 
 
 # Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource
-$Script:DatasourceURLs = @{}
+$Script:DatasourceURLs = @{ }
 $Script:DatasourceURLs.Add("vcenter", @("/data-sources/vcenters"))
 $Script:DatasourceURLs.Add("nsxv", @("/data-sources/nsxv-managers"))
 $Script:DatasourceURLs.Add("nsxt", @("/data-sources/nsxt-managers"))
@@ -42,7 +42,7 @@ foreach ($h in $Script:DatasourceURLs.GetEnumerator()) {
 $Script:DatasourceURLs.Add("all", $allURLs)
 
 # Keep another list handy which translates the internal vRNI Names for datasources to their relative URLs
-$Script:DatasourceInternalURLs = @{}
+$Script:DatasourceInternalURLs = @{ }
 $Script:DatasourceInternalURLs.Add("VCenterDataSource", "/data-sources/vcenters")
 $Script:DatasourceInternalURLs.Add("NSXVManagerDataSource", "/data-sources/nsxv-managers")
 $Script:DatasourceInternalURLs.Add("NSXTManagerDataSource", "/data-sources/nsxt-managers")
@@ -70,7 +70,7 @@ $Script:DatasourceInternalURLs.Add("FortinetFirewallDataSource", "/data-sources/
 $Script:DatasourceInternalURLs.Add("GenericSwitchDataSource", "/data-sources/generic-switches")
 
 # This list will be used in Get-vRNIEntity to map entity URLs to their IDs so we can use those IDs in /entities/fetch
-$Script:EntityURLtoIdMapping = @{}
+$Script:EntityURLtoIdMapping = @{ }
 $Script:EntityURLtoIdMapping.Add("problems", "ProblemEvent")
 $Script:EntityURLtoIdMapping.Add("vms", "VirtualMachine")
 $Script:EntityURLtoIdMapping.Add("vnics", "Vnic")
@@ -99,12 +99,11 @@ $Script:EntityURLtoIdMapping.Add("kubernetes-services", "KubernetesService")
 # principles on which this module is built on.
 
 # Run at module load time to determine a few things about the platform this module is running on.
-function _PvRNI_init
-{
+function _PvRNI_init {
   # $PSVersionTable.PSEdition property does not exist pre v5.  We need to do a few things in
   # exported functions to workaround some limitations of core edition, so we export
   # the global PNSXPSTarget var to reference if required.
-  if(($PSVersionTable.PSVersion.Major -ge 6) -or (($PSVersionTable.PSVersion.Major -eq 5) -And ($PSVersionTable.PSVersion.Minor -ge 1))) {
+  if (($PSVersionTable.PSVersion.Major -ge 6) -or (($PSVersionTable.PSVersion.Major -eq 5) -And ($PSVersionTable.PSVersion.Minor -ge 1))) {
     $script:PvRNI_PlatformType = $PSVersionTable.PSEdition
   }
   else {
@@ -126,15 +125,14 @@ function _PvRNI_init
     }
 "@
 
-  if($script:PvRNI_PlatformType -eq "Desktop") {
+  if ($script:PvRNI_PlatformType -eq "Desktop") {
     if (-not ("TrustAllCertsPolicy" -as [type])) {
       Add-Type $TrustAllCertsPolicy
     }
   }
 }
 
-function Invoke-vRNIRestMethod
-{
+function Invoke-vRNIRestMethod {
   <#
   .SYNOPSIS
   Forms and executes a REST API call to a vRealize Network Insight Platform VM.
@@ -168,42 +166,40 @@ function Invoke-vRNIRestMethod
   is returned.
   #>
 
-  [CmdletBinding(DefaultParameterSetName="ConnectionObj")]
+  [CmdletBinding(DefaultParameterSetName = "ConnectionObj")]
 
   param (
-    [Parameter (Mandatory=$true,ParameterSetName="Parameter")]
-      # vRNI Platform server
-      [string]$Server,
-    [Parameter (Mandatory=$true,ParameterSetName="Parameter")]
-    [Parameter (ParameterSetName="ConnectionObj")]
-      # REST Method (GET, POST, DELETE, UPDATE)
-      [string]$Method,
-    [Parameter (Mandatory=$true,ParameterSetName="Parameter")]
-    [Parameter (ParameterSetName="ConnectionObj")]
-      # URI of API endpoint (/api/ni/endpoint)
-      [string]$URI,
-    [Parameter (Mandatory=$false,ParameterSetName="Parameter")]
-    [Parameter (ParameterSetName="ConnectionObj")]
-      # Content to be sent to server when method is PUT/POST/PATCH
-      [string]$Body = "",
-    [Parameter (Mandatory=$false,ParameterSetName="Parameter")]
-    [Parameter (ParameterSetName="ConnectionObj")]
-      # Save content to file
-      [string]$OutFile = "",
-    [Parameter (Mandatory=$false,ParameterSetName="Parameter")]
-    [Parameter (ParameterSetName="ConnectionObj")]
-        # Override Content-Type
-        [string]$ContentType = "application/json",
-    [Parameter (Mandatory=$false,ParameterSetName="ConnectionObj")]
-      # Pre-populated connection object as returned by Connect-vRNIServer
-      [psObject]$Connection
+    [Parameter (Mandatory = $true, ParameterSetName = "Parameter")]
+    # vRNI Platform server
+    [string]$Server,
+    [Parameter (Mandatory = $true, ParameterSetName = "Parameter")]
+    [Parameter (ParameterSetName = "ConnectionObj")]
+    # REST Method (GET, POST, DELETE, UPDATE)
+    [string]$Method,
+    [Parameter (Mandatory = $true, ParameterSetName = "Parameter")]
+    [Parameter (ParameterSetName = "ConnectionObj")]
+    # URI of API endpoint (/api/ni/endpoint)
+    [string]$URI,
+    [Parameter (Mandatory = $false, ParameterSetName = "Parameter")]
+    [Parameter (ParameterSetName = "ConnectionObj")]
+    # Content to be sent to server when method is PUT/POST/PATCH
+    [string]$Body = "",
+    [Parameter (Mandatory = $false, ParameterSetName = "Parameter")]
+    [Parameter (ParameterSetName = "ConnectionObj")]
+    # Save content to file
+    [string]$OutFile = "",
+    [Parameter (Mandatory = $false, ParameterSetName = "Parameter")]
+    [Parameter (ParameterSetName = "ConnectionObj")]
+    # Override Content-Type
+    [string]$ContentType = "application/json",
+    [Parameter (Mandatory = $false, ParameterSetName = "ConnectionObj")]
+    # Pre-populated connection object as returned by Connect-vRNIServer
+    [psObject]$Connection
   )
 
-  if ($pscmdlet.ParameterSetName -eq "ConnectionObj")
-  {
+  if ($pscmdlet.ParameterSetName -eq "ConnectionObj") {
     # Ensure we were either called with a connection or there is a defaultConnection (user has called Connect-vRNIServer)
-    if ($null -eq $connection)
-    {
+    if ($null -eq $connection) {
       # Now we need to assume that defaultvRNIConnection does not exist...
       if ( -not (test-path variable:global:defaultvRNIConnection) ) {
         throw "Not connected. Connect to vRNI with Connect-vRNIServer first."
@@ -218,7 +214,7 @@ function Invoke-vRNIRestMethod
     $server = $connection.Server
 
     # Check if the authentication token hasn't expired yet
-    if((Get-Date) -gt $connection.AuthTokenExpiry) {
+    if ((Get-Date) -gt $connection.AuthTokenExpiry) {
       throw "The vRNI Authentication token has expired (expired at '$($connection.AuthTokenExpiry.DateTime)'). Please login again using Connect-vRNIServer."
     }
   }
@@ -227,17 +223,16 @@ function Invoke-vRNIRestMethod
   Start-Sleep -m 100
 
   # Create a header option dictionary, to be used for authentication (if we have an existing session) and other RESTy stuff
-  $headerDict = @{}
+  $headerDict = @{ }
   $headerDict.add("Content-Type", $ContentType)
 
   # Add the auth token to the headers, if the CSPToken is not filled out
-  if($authtoken -ne "") {
+  if ($authtoken -ne "") {
     $headerDict.add("Authorization", "NetworkInsight $authtoken")
   }
   # Add the Cloud Services Platform token if available (means we're using Network Insight as a Service)
-  if($null -ne $connection)
-  {
-    if($null -ne $connection.CSPToken) {
+  if ($null -ne $connection) {
+    if ($null -ne $connection.CSPToken) {
       $headerDict.remove("Authorization")
       $headerDict.add("csp-auth-token", $connection.CSPToken)
     }
@@ -251,41 +246,39 @@ function Invoke-vRNIRestMethod
 
   # Build up Invoke-RestMethod parameters, can differ per platform
   $invokeRestMethodParams = @{
-    "Method" = $Method;
-    "Headers" = $headerDict;
+    "Method"      = $Method;
+    "Headers"     = $headerDict;
     "ContentType" = $ContentType;
-    "Uri" = $URL;
+    "Uri"         = $URL;
   }
 
   # If a body for a POST request has been specified, add it to the parameters for Invoke-RestMethod
-  if($Body -ne "") {
+  if ($Body -ne "") {
     $invokeRestMethodParams.Add("Body", $body)
   }
 
   # If we want to save the output to a file (Get-vRNIRecommendedRulesNsxBundle uses this), specify -OutFile
-  if($OutFile -ne "") {
+  if ($OutFile -ne "") {
     $invokeRestMethodParams.Add("OutFile", $OutFile)
   }
 
   # Add a trigger to ignore SSL certificate checks, if we're not using Network Insight as a Service (self-hosted usually have self-signed certificates)
   $SkipSSLCheck = $True
-  if($null -ne $connection) {
-    if($connection.CSPToken -eq "") {
+  if ($null -ne $connection) {
+    if ($connection.CSPToken -eq "") {
       $SkipSSLCheck = $False
     }
   }
 
-  if($SkipSSLCheck -eq $True)
-  {
-    if(($script:PvRNI_PlatformType -eq "Desktop"))
-    {
+  if ($SkipSSLCheck -eq $True) {
+    if (($script:PvRNI_PlatformType -eq "Desktop")) {
       # Allow untrusted certificate presented by the remote system to be accepted
-      if([System.Net.ServicePointManager]::CertificatePolicy.tostring() -ne 'TrustAllCertsPolicy') {
+      if ([System.Net.ServicePointManager]::CertificatePolicy.tostring() -ne 'TrustAllCertsPolicy') {
         [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
       }
     }
     # Core (for now) uses a different mechanism to manipulating [System.Net.ServicePointManager]::CertificatePolicy
-    if(($script:PvRNI_PlatformType -eq "Core")) {
+    if (($script:PvRNI_PlatformType -eq "Core")) {
       $invokeRestMethodParams.Add("SkipCertificateCheck", $true)
     }
   }
@@ -294,8 +287,7 @@ function Invoke-vRNIRestMethod
   [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
 
   # Energize!
-  try
-  {
+  try {
     $response = Invoke-RestMethod @invokeRestMethodParams
   }
 
@@ -316,8 +308,7 @@ function Invoke-vRNIRestMethod
       ## throw the actual error, so that the consumer can debug via the actuall ErrorRecord
       Throw $_
     }
-    else
-    {
+    else {
       # No response, log and throw the underlying ex
       $ErrorString = "$($MyInvocation.MyCommand.Name) : Exception occured calling invoke-restmethod. $($_.exception.tostring())"
       Write-Warning -Message $_.exception.tostring()
@@ -347,7 +338,7 @@ function Invoke-vRNIRestMethod
   #$ServicePoint.CloseConnectionGroup("") | out-null
 
   # Return result
-  if($response) { $response }
+  if ($response) { $response }
 }
 
 #####################################################################################################################
@@ -356,8 +347,7 @@ function Invoke-vRNIRestMethod
 #####################################################################################################################
 #####################################################################################################################
 
-function Connect-vRNIServer
-{
+function Connect-vRNIServer {
   <#
   .SYNOPSIS
   Connects to the specified vRealize Network Insight Platform VM and
@@ -401,44 +391,42 @@ function Connect-vRNIServer
   that specific vRNI instance.
   #>
   param (
-    [Parameter (Mandatory=$true)]
-      # vRNI Platform hostname or IP address
-      [ValidateNotNullOrEmpty()]
-      [string]$Server,
-    [Parameter (Mandatory=$false)]
-      # Username to use to login to vRNI
-      [ValidateNotNullOrEmpty()]
-      [string]$Username,
-    [Parameter (Mandatory=$false)]
-      # Password to use to login to vRNI
-      [ValidateNotNullOrEmpty()]
-      [string]$Password,
-    [Parameter (Mandatory=$false)]
-      #PSCredential object containing NSX API authentication credentials
-      [PSCredential]$Credential,
-    [Parameter (Mandatory=$false)]
-      # Domain to use to login to vRNI - Deprecated, use the full username (something@anything.com) for LDAP auth, and the UseLocalAuth parameter to force local user auth
-      [ValidateNotNullOrEmpty()]
-      [string]$Domain = "",
-    [Parameter (Mandatory=$false)]
-      # Are we doing local authentication?
-      [ValidateNotNullOrEmpty()]
-      [switch]$UseLocalAuth
+    [Parameter (Mandatory = $true)]
+    # vRNI Platform hostname or IP address
+    [ValidateNotNullOrEmpty()]
+    [string]$Server,
+    [Parameter (Mandatory = $false)]
+    # Username to use to login to vRNI
+    [ValidateNotNullOrEmpty()]
+    [string]$Username,
+    [Parameter (Mandatory = $false)]
+    # Password to use to login to vRNI
+    [ValidateNotNullOrEmpty()]
+    [string]$Password,
+    [Parameter (Mandatory = $false)]
+    #PSCredential object containing NSX API authentication credentials
+    [PSCredential]$Credential,
+    [Parameter (Mandatory = $false)]
+    # Domain to use to login to vRNI - Deprecated, use the full username (something@anything.com) for LDAP auth, and the UseLocalAuth parameter to force local user auth
+    [ValidateNotNullOrEmpty()]
+    [string]$Domain = "",
+    [Parameter (Mandatory = $false)]
+    # Are we doing local authentication?
+    [ValidateNotNullOrEmpty()]
+    [switch]$UseLocalAuth
   )
 
   # Make sure either -Credential is set, or both -Username and -Password
-  if(($PsBoundParameters.ContainsKey("Credential")  -And $PsBoundParameters.ContainsKey("Username")) -Or
-     ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Password")))
-  {
+  if (($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Username")) -Or
+    ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Password"))) {
     throw "Specify either -Credential or -Username to authenticate (if using -Username and omitting -Password, a prompt will be given)"
   }
 
   # Build cred object for default auth if user specified username/pass
   $connection_credentials = ""
-  if($PsBoundParameters.ContainsKey("Username"))
-  {
+  if ($PsBoundParameters.ContainsKey("Username")) {
     # Is the -Password omitted? Prompt securely
-    if(!$PsBoundParameters.ContainsKey("Password")) {
+    if (!$PsBoundParameters.ContainsKey("Password")) {
       $connection_credentials = Get-Credential -UserName $Username -Message "vRealize Network Insight Platform Authentication"
     }
     # If the password has been given in cleartext,
@@ -447,12 +435,11 @@ function Connect-vRNIServer
     }
   }
   # If a credential object was given as a parameter, use that
-  elseif($PSBoundParameters.ContainsKey("Credential"))
-  {
+  elseif ($PSBoundParameters.ContainsKey("Credential")) {
     $connection_credentials = $Credential
   }
   # If no -Username or -Credential was given, prompt for credentials
-  elseif(!$PSBoundParameters.ContainsKey("Credential")) {
+  elseif (!$PSBoundParameters.ContainsKey("Credential")) {
     $connection_credentials = Get-Credential -Message "vRealize Network Insight Platform Authentication"
   }
 
@@ -465,19 +452,17 @@ function Connect-vRNIServer
   # Figure out if the username is a local or remote username
   $parts = $Username.split("@")
   # If no domain param is given, use the default LOCAL domain and populate the "domain" field
-  if($parts[1] -eq "local" -Or $UseLocalAuth -eq $True -Or $Domain -eq "LOCAL")
-  {
+  if ($parts[1] -eq "local" -Or $UseLocalAuth -eq $True -Or $Domain -eq "LOCAL") {
     $requestFormat.domain = @{
       "domain_type" = "LOCAL"
-      "value" = "local"
+      "value"       = "local"
     }
   }
   # Otherwise there a LDAP domain requested for credentials
-  else
-  {
+  else {
     $requestFormat.domain = @{
       "domain_type" = "LDAP"
-      "value" = $parts[1]
+      "value"       = $parts[1]
     }
   }
 
@@ -490,12 +475,11 @@ function Connect-vRNIServer
   $response = Invoke-vRNIRestMethod -Server $Server -Method POST -URI "/api/ni/auth/token" -Body $requestBody
   Write-Debug "Response: $($response)"
 
-  if($response)
-  {
+  if ($response) {
     # Setup a custom object to contain the parameters of the connection
     $connection = [pscustomObject] @{
-      "Server" = $Server
-      "AuthToken" = $response.token
+      "Server"          = $Server
+      "AuthToken"       = $response.token
       ## the expiration of the token; currently (vRNI API v1.0), tokens are valid for five (5) hours
       "AuthTokenExpiry" = (Get-Date "01 Jan 1970").AddMilliseconds($response.expiry).ToLocalTime()
     }
@@ -511,8 +495,7 @@ function Connect-vRNIServer
   }
 }
 
-function Disconnect-vRNIServer
-{
+function Disconnect-vRNIServer {
   <#
   .SYNOPSIS
   Destroys the Connection object if provided, otherwise this destroys the
@@ -532,10 +515,10 @@ function Disconnect-vRNIServer
   Invalidates the authentication token of a specific connection object
   #>
   param (
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Invalidate auth token from vRNI
@@ -551,8 +534,7 @@ function Disconnect-vRNIServer
   $result
 }
 
-function Connect-NIServer
-{
+function Connect-NIServer {
   <#
   .SYNOPSIS
   Connects to the Network Insight Service on the VMware Cloud Services
@@ -575,27 +557,26 @@ function Connect-NIServer
   access token. Returns the connection object, if successful.
   #>
   param (
-    [Parameter (Mandatory=$true)]
-      # The Refresh Token from your VMware Cloud Services Portal
-      [ValidateNotNullOrEmpty()]
-      [string]$RefreshToken
+    [Parameter (Mandatory = $true)]
+    # The Refresh Token from your VMware Cloud Services Portal
+    [ValidateNotNullOrEmpty()]
+    [string]$RefreshToken
   )
 
   # Only use TLS as SSL connection to vRNI
   [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
 
   $URL = "https://console.cloud.vmware.com/csp/gateway/am/api/auth/api-tokens/authorize?refresh_token=$($RefreshToken)"
-  $response = Invoke-WebRequest -URI $URL -ContentType "application/json" -Method POST -UseBasicParsing -Headers @{"csp-auth-token"="$($RefreshToken)"}
+  $response = Invoke-WebRequest -URI $URL -ContentType "application/json" -Method POST -UseBasicParsing -Headers @{"csp-auth-token" = "$($RefreshToken)" }
   Write-Debug "Response: $($response)"
 
-  if($response)
-  {
+  if ($response) {
     $response = ($response | ConvertFrom-Json)
 
     # Setup a custom object to contain the parameters of the connection, including the URL to the CSP API & Access token
     $connection = [pscustomObject] @{
-      "Server" = "api.mgmt.cloud.vmware.com/ni"
-      "CSPToken" = $response.access_token
+      "Server"          = "api.mgmt.cloud.vmware.com/ni"
+      "CSPToken"        = $response.access_token
       ## the expiration of the token; currently (vRNI API v1.0), tokens are valid for five (5) hours
       "AuthTokenExpiry" = (Get-Date).AddSeconds($response.expires_in).ToLocalTime()
     }
@@ -617,8 +598,7 @@ function Connect-NIServer
 #####################################################################################################################
 #####################################################################################################################
 
-function Get-vRNINodes
-{
+function Get-vRNINodes {
   <#
   .SYNOPSIS
   Retrieve details of the vRealize Network Insight nodes.
@@ -638,10 +618,10 @@ function Get-vRNINodes
   Retrieves information about all available nodes, but filter on the collector VMs.
   #>
   param (
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Get a list of available nodes first, this call returns a list of node IDs, which we can use
@@ -651,8 +631,7 @@ function Get-vRNINodes
   # Use this as a result container
   $nodes_details = [System.Collections.ArrayList]@()
 
-  foreach($node_record in $nodes.results)
-  {
+  foreach ($node_record in $nodes.results) {
     # Retrieve the node details and store those
     $node_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/infra/nodes/$($node_record.id)"
     $nodes_details.Add($node_info) | Out-Null
@@ -661,8 +640,7 @@ function Get-vRNINodes
   $nodes_details
 }
 
-function Get-vRNIAPIVersion
-{
+function Get-vRNIAPIVersion {
   <#
   .SYNOPSIS
   Retrieve the version number of the vRealize Network Insight API.
@@ -676,10 +654,10 @@ function Get-vRNIAPIVersion
   Returns the version number of the vRNI API.
   #>
   param (
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   $version = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/info/version"
@@ -692,8 +670,7 @@ function Get-vRNIAPIVersion
 #####################################################################################################################
 #####################################################################################################################
 
-function Get-vRNIDataSource
-{
+function Get-vRNIDataSource {
   <#
   .SYNOPSIS
   Retrieve datasource information
@@ -713,14 +690,13 @@ function Get-vRNIDataSource
   Retrieves the defaults of all NSX Managers added to vRNI as a datasource.
   #>
   param (
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
-  DynamicParam
-  {
+  DynamicParam {
     # Use a dynamic parameter to get a list of all data source names from $Script:DatasourceURLs
     $ParameterName = 'DataSourceType'
 
@@ -750,14 +726,13 @@ function Get-vRNIDataSource
     $RuntimeParameterDictionary.Add($ParameterName, $RuntimeParameter)
     return $RuntimeParameterDictionary
   }
-  Process
-  {
+  Process {
     # Bind the parameter to a friendly variable
-    if($PSBoundParameters.ContainsKey("DataSourceType")) {
+    if ($PSBoundParameters.ContainsKey("DataSourceType")) {
       New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
     }
 
-    if(!$DataSourceType) {
+    if (!$DataSourceType) {
       $DataSourceType = "all"
     }
 
@@ -767,17 +742,14 @@ function Get-vRNIDataSource
     # Because each datasource type has its unique URL (/api/ni/data-sources/vcenter, /data-sources/ucs-manager, etc),
     # and we want all the datasource information, loop through the URLs of the types we want to retrieve and
     $datasource_types_to_get = $Script:DatasourceURLs.$DataSourceType
-    foreach($datasource_uri in $datasource_types_to_get)
-    {
+    foreach ($datasource_uri in $datasource_types_to_get) {
       # Energize!
       $response = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)"
 
       # Process results, if there are datasources of this type. The results of the /api/ni/data-sources/$TYPE call is a
       # list of datasource IDs and not much more. We take that ID and do a call for details on that datasource
-      if($response.results -ne "")
-      {
-        foreach ($datasource in $response.results)
-        {
+      if ($response.results -ne "") {
+        foreach ($datasource in $response.results) {
           # Retrieve datasource details and store it
           $datasource_detail = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)/$($datasource.entity_id)"
           $datasources.Add($datasource_detail) | Out-Null
@@ -790,8 +762,7 @@ function Get-vRNIDataSource
   }
 }
 
-function New-vRNIDataSource
-{
+function New-vRNIDataSource {
   <#
   .SYNOPSIS
   Create new datasources within vRealize Network Insight to retrieve data from.
@@ -834,118 +805,117 @@ function New-vRNIDataSource
   Add a Kubernetes cluster as a data source. First gets the entity ID of the NSX-T Manager supporting the container network, then vRNI Collector ID, then puts the kubeconfig file into a string, and finally adds the Kubernetes cluster to vRNI.
   #>
 
-  [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
+  [CmdletBinding(DefaultParameterSetName = "__AllParameterSets")]
 
   param (
-    [Parameter (Mandatory=$false)]
-      # Username to use to login to the datasource
-      [ValidateNotNullOrEmpty()]
-      [string]$Username = "",
-    [Parameter (Mandatory=$false)]
-      # Password to use to login to the datasource
-      [ValidateNotNullOrEmpty()]
-      [string]$Password = "",
+    [Parameter (Mandatory = $false)]
+    # Username to use to login to the datasource
+    [ValidateNotNullOrEmpty()]
+    [string]$Username = "",
+    [Parameter (Mandatory = $false)]
+    # Password to use to login to the datasource
+    [ValidateNotNullOrEmpty()]
+    [string]$Password = "",
 
-    [Parameter (Mandatory=$false)]
-      # The IP address of the datasource
-      [ValidateNotNullOrEmpty()]
-      [string]$IP,
-    [Parameter (Mandatory=$false)]
-      # The FDQN address of the datasource
-      [ValidateNotNullOrEmpty()]
-      [string]$FDQN,
+    [Parameter (Mandatory = $false)]
+    # The IP address of the datasource
+    [ValidateNotNullOrEmpty()]
+    [string]$IP,
+    [Parameter (Mandatory = $false)]
+    # The FDQN address of the datasource
+    [ValidateNotNullOrEmpty()]
+    [string]$FDQN,
 
-    [Parameter (Mandatory=$true)]
-      # Collector (Proxy) Node ID
-      [ValidateNotNullOrEmpty()]
-      [string]$CollectorVMId,
+    [Parameter (Mandatory = $true)]
+    # Collector (Proxy) Node ID
+    [ValidateNotNullOrEmpty()]
+    [string]$CollectorVMId,
 
-    [Parameter (Mandatory=$true)]
-      # Nickname for the datasource
-      [ValidateNotNullOrEmpty()]
-      [string]$Nickname="",
+    [Parameter (Mandatory = $true)]
+    # Nickname for the datasource
+    [ValidateNotNullOrEmpty()]
+    [string]$Nickname = "",
 
-    [Parameter (Mandatory=$false)]
-      # Whether we want to enable the datasource
-      [ValidateNotNullOrEmpty()]
-      [bool]$Enabled=$True,
+    [Parameter (Mandatory = $false)]
+    # Whether we want to enable the datasource
+    [ValidateNotNullOrEmpty()]
+    [bool]$Enabled = $True,
 
-    [Parameter (Mandatory=$false)]
-      # Optional notes for the datasource
-      [ValidateNotNullOrEmpty()]
-      [string]$Notes="",
+    [Parameter (Mandatory = $false)]
+    # Optional notes for the datasource
+    [ValidateNotNullOrEmpty()]
+    [string]$Notes = "",
 
     # These params are only required when adding a NSX Manager as datasource
-    [Parameter (Mandatory=$False, ParameterSetName="NSXDS")]
-      # Enable the central CLI collection
-      [ValidateNotNullOrEmpty()]
-      [bool]$NSXEnableCentralCLI = $True,
+    [Parameter (Mandatory = $False, ParameterSetName = "NSXDS")]
+    # Enable the central CLI collection
+    [ValidateNotNullOrEmpty()]
+    [bool]$NSXEnableCentralCLI = $True,
 
-    [Parameter (Mandatory=$False, ParameterSetName="NSXDS")]
-      # Enable NSX IPFIX as a source
-      [ValidateNotNullOrEmpty()]
-      [bool]$NSXEnableIPFIX = $True,
+    [Parameter (Mandatory = $False, ParameterSetName = "NSXDS")]
+    # Enable NSX IPFIX as a source
+    [ValidateNotNullOrEmpty()]
+    [bool]$NSXEnableIPFIX = $True,
 
-    [Parameter (Mandatory=$false, ParameterSetName="NSXDS")]
-      # Enable Virtual Latency (VTEP, VNIC, & PNIC) streaming from NSX to vRNI
-      [ValidateNotNullOrEmpty()]
-      [bool]$NSXEnableLatency = $False,
+    [Parameter (Mandatory = $false, ParameterSetName = "NSXDS")]
+    # Enable Virtual Latency (VTEP, VNIC, & PNIC) streaming from NSX to vRNI
+    [ValidateNotNullOrEmpty()]
+    [bool]$NSXEnableLatency = $False,
 
-    [Parameter (Mandatory=$False, ParameterSetName="NSXDS")]
-      # vCenter ID that this NSX Manager will be linked too
-      [ValidateNotNullOrEmpty()]
-      [string]$NSXvCenterID = "",
+    [Parameter (Mandatory = $False, ParameterSetName = "NSXDS")]
+    # vCenter ID that this NSX Manager will be linked too
+    [ValidateNotNullOrEmpty()]
+    [string]$NSXvCenterID = "",
 
     # This params is only required when adding a cisco switch
-    [Parameter (Mandatory=$true, ParameterSetName="CISCOSWITCH")]
-      # Set the switch type
-      [ValidateSet ("CATALYST_3000", "CATALYST_4500", "CATALYST_6500", "NEXUS_5K", "NEXUS_7K", "NEXUS_9K")]
-      [string]$CiscoSwitchType,
+    [Parameter (Mandatory = $true, ParameterSetName = "CISCOSWITCH")]
+    # Set the switch type
+    [ValidateSet ("CATALYST_3000", "CATALYST_4500", "CATALYST_6500", "NEXUS_5K", "NEXUS_7K", "NEXUS_9K")]
+    [string]$CiscoSwitchType,
 
     # This params is only required when adding a dell switch
-    [Parameter (Mandatory=$true, ParameterSetName="DELLSWITCH")]
-      # Set the switch type
-      [ValidateSet ("FORCE_10_MXL_10", "POWERCONNECT_8024", "S4048", "Z9100", "S6000")]
-      [string]$DellSwitchType,
+    [Parameter (Mandatory = $true, ParameterSetName = "DELLSWITCH")]
+    # Set the switch type
+    [ValidateSet ("FORCE_10_MXL_10", "POWERCONNECT_8024", "S4048", "Z9100", "S6000")]
+    [string]$DellSwitchType,
 
     # These params are only required when adding an Azure subscription as datasource
-    [Parameter (Mandatory=$true, ParameterSetName="AZURE")]
-      # Azure Tenant ID
-      [ValidateNotNullOrEmpty()]
-      [string]$TenantID,
-    [Parameter (Mandatory=$true, ParameterSetName="AZURE")]
-      # Azure Application ID
-      [ValidateNotNullOrEmpty()]
-      [string]$ApplicationID,
-    [Parameter (Mandatory=$true, ParameterSetName="AZURE")]
-      # Azure Secret Key
-      [ValidateNotNullOrEmpty()]
-      [string]$SecretKey,
-    [Parameter (Mandatory=$true, ParameterSetName="AZURE")]
-      # Azure Subscription ID
-      [ValidateNotNullOrEmpty()]
-      [string]$SubscriptionID,
-    [Parameter (Mandatory=$false, ParameterSetName="AZURE")]
-      # Retrieve Flows?
-      [ValidateNotNullOrEmpty()]
-      [bool]$FlowsEnabled = $True,
+    [Parameter (Mandatory = $true, ParameterSetName = "AZURE")]
+    # Azure Tenant ID
+    [ValidateNotNullOrEmpty()]
+    [string]$TenantID,
+    [Parameter (Mandatory = $true, ParameterSetName = "AZURE")]
+    # Azure Application ID
+    [ValidateNotNullOrEmpty()]
+    [string]$ApplicationID,
+    [Parameter (Mandatory = $true, ParameterSetName = "AZURE")]
+    # Azure Secret Key
+    [ValidateNotNullOrEmpty()]
+    [string]$SecretKey,
+    [Parameter (Mandatory = $true, ParameterSetName = "AZURE")]
+    # Azure Subscription ID
+    [ValidateNotNullOrEmpty()]
+    [string]$SubscriptionID,
+    [Parameter (Mandatory = $false, ParameterSetName = "AZURE")]
+    # Retrieve Flows?
+    [ValidateNotNullOrEmpty()]
+    [bool]$FlowsEnabled = $True,
 
-    [Parameter (Mandatory=$False, ParameterSetName="KUBERNETES")]
-      # KubeConfig as a string
-      [ValidateNotNullOrEmpty()]
-      [string]$KubeConfig,
-    [Parameter (Mandatory=$True, ParameterSetName="KUBERNETES")]
-      # NSX-T Manager entity ID
-      [ValidateNotNullOrEmpty()]
-      [string]$NSXTManagerID,
+    [Parameter (Mandatory = $False, ParameterSetName = "KUBERNETES")]
+    # KubeConfig as a string
+    [ValidateNotNullOrEmpty()]
+    [string]$KubeConfig,
+    [Parameter (Mandatory = $True, ParameterSetName = "KUBERNETES")]
+    # NSX-T Manager entity ID
+    [ValidateNotNullOrEmpty()]
+    [string]$NSXTManagerID,
 
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
-  DynamicParam
-  {
+  DynamicParam {
     # Use a dynamic parameter to get a list of all data source names from $Script:DatasourceURLs
     $ParameterName = 'DataSourceType'
 
@@ -975,72 +945,69 @@ function New-vRNIDataSource
     $RuntimeParameterDictionary.Add($ParameterName, $RuntimeParameter)
     return $RuntimeParameterDictionary
   }
-  Process
-  {
+  Process {
     # Bind the parameter to a friendly variable
     New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
 
-    if($IP -ne "" -And $FDQN -ne "") {
+    if ($IP -ne "" -And $FDQN -ne "") {
       throw "Please only provide the FDQN or the IP address for the datasource, not both."
     }
 
     # Require username and password for everything except Azure, K8s, and OpenShift
-    if(($DataSourceType -ne "azure" -And $DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") -And ($Username -eq "" -Or $Password -eq "")) {
+    if (($DataSourceType -ne "azure" -And $DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") -And ($Username -eq "" -Or $Password -eq "")) {
       throw "Please provide the Username and Password parameters as the credentials to connect to the data source."
     }
 
     # Check if the NSXDS parameter set is used when adding a NSX Manager as datasource
-    if($DataSourceType -eq "nsxv" -And $PSCmdlet.ParameterSetName -ne "NSXDS") {
+    if ($DataSourceType -eq "nsxv" -And $PSCmdlet.ParameterSetName -ne "NSXDS") {
       throw "Please provide the NSX parameters when adding a NSX Manager."
     }
-    if($DataSourceType -eq "nsxv" -And $NSXvCenterID -eq "") {
+    if ($DataSourceType -eq "nsxv" -And $NSXvCenterID -eq "") {
       throw "Please provide the NSXvCenterID parameter when adding a NSX-v Manager."
     }
 
     # Check if the KUBERNETES parameter set is used when adding K8s or OpenShift as datasource
-    if(($DataSourceType -eq "kubernetes" -Or $DataSourceType -eq "openshift" -Or $DataSourceType -eq "pks") -And $PSCmdlet.ParameterSetName -ne "KUBERNETES") {
+    if (($DataSourceType -eq "kubernetes" -Or $DataSourceType -eq "openshift" -Or $DataSourceType -eq "pks") -And $PSCmdlet.ParameterSetName -ne "KUBERNETES") {
       throw "Please provide the KubeConfig and NSXTManagerID parameters when adding an OpenShift or Kubernetes data source. PKS only needs the NSXTManagerID"
     }
 
 
     # Check if the switch type is provided, when adding a Cisco of Dell switch
-    if($DataSourceType -eq "ciscoswitch" -And $PSCmdlet.ParameterSetName -ne "CISCOSWITCH") {
+    if ($DataSourceType -eq "ciscoswitch" -And $PSCmdlet.ParameterSetName -ne "CISCOSWITCH") {
       throw "Please provide the -CiscoSwitchType parameter when adding a Cisco switch."
     }
-    if($DataSourceType -eq "dellswitch" -And $PSCmdlet.ParameterSetName -ne "DELLSWITCH") {
+    if ($DataSourceType -eq "dellswitch" -And $PSCmdlet.ParameterSetName -ne "DELLSWITCH") {
       throw "Please provide the -DellSwitchType parameter when adding a Dell switch."
     }
-    if($DataSourceType -eq "azure" -And $PSCmdlet.ParameterSetName -ne "AZURE") {
+    if ($DataSourceType -eq "azure" -And $PSCmdlet.ParameterSetName -ne "AZURE") {
       throw "Please provide the TenantID, ApplicationID, SecretKey, and SubscriptionID parameters when adding an Azure subscription."
     }
 
     # Format request with all given data
     $requestFormat = @{
-      "ip" = $IP
-      "fqdn" = $FDQN
+      "ip"       = $IP
+      "fqdn"     = $FDQN
       "proxy_id" = $CollectorVMId
       "nickname" = $Nickname
-      "notes" = $Notes
-      "enabled" = $Enabled
+      "notes"    = $Notes
+      "enabled"  = $Enabled
     }
 
     # ServiceNow uses instance_id as the FQDN
-    if($DataSourceType -eq "servicenow") {
+    if ($DataSourceType -eq "servicenow") {
       $requestFormat.instance_id = $FDQN
       $requestFormat.is_graph_config_customized = "false" # TODO: support customised relation graphs
     }
 
     # For any other data source than a generic (UANI) switch, K8s or OpenShift, use regular credentials
-    if($DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") {
+    if ($DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") {
       $requestFormat.credentials = @{
         "username" = $Username
         "password" = $Password
       }
     }
-    else
-    {
-      if($DataSourceType -eq "kubernetes" -Or $DataSourceType -ne "openshift")
-      {
+    else {
+      if ($DataSourceType -eq "kubernetes" -Or $DataSourceType -ne "openshift") {
         # Add KubeConfig and NSX-T Manager entity ID for OpenShift or K8s
         $requestFormat.manager_id = $NSXTManagerID
         $requestFormat.credentials = @{
@@ -1048,39 +1015,39 @@ function New-vRNIDataSource
         }
       }
     }
-    if($DataSourceType -eq "pks") {
+    if ($DataSourceType -eq "pks") {
       # Add NSX-T Manager entity ID for PKS
       $requestFormat.manager_id = $NSXTManagerID
     }
 
     # If we're adding a NSX Manager, also add the NSX parameters to the body
-    if($DataSourceType -eq "nsxv") {
+    if ($DataSourceType -eq "nsxv") {
       $requestFormat.vcenter_id = $NSXvCenterID
       $requestFormat.ipfix_enabled = $NSXEnableIPFIX
       $requestFormat.central_cli_enabled = $NSXEnableCentralCLI
       $requestFormat.latency_enabled = $NSXEnableLatency
     }
 
-    if($DataSourceType -eq "nsxt") {
+    if ($DataSourceType -eq "nsxt") {
       $requestFormat.ipfix_enabled = $NSXEnableIPFIX
       $requestFormat.latency_enabled = $NSXEnableLatency
     }
 
     # When adding a Cisco or Dell switch, provide the switch_type key in the body
-    if($DataSourceType -eq "ciscoswitch") {
+    if ($DataSourceType -eq "ciscoswitch") {
       $requestFormat.switch_type = $CiscoSwitchType
     }
-    if($DataSourceType -eq "dellswitch") {
+    if ($DataSourceType -eq "dellswitch") {
       $requestFormat.switch_type = $DellSwitchType
     }
 
     # Add the application registration details for Azure subscriptions
-    if($DataSourceType -eq "azure") {
+    if ($DataSourceType -eq "azure") {
       $requestFormat.flows_enabled = $FlowsEnabled
       $requestFormat.credentials = @{
-        "azure_client" = $ApplicationID
-        "azure_key" = $SecretKey
-        "azure_tenant" = $TenantID
+        "azure_client"       = $ApplicationID
+        "azure_key"          = $SecretKey
+        "azure_tenant"       = $TenantID
         "azure_subscription" = $SubscriptionID
       }
     }
@@ -1094,8 +1061,7 @@ function New-vRNIDataSource
   }
 }
 
-function Remove-vRNIDataSource
-{
+function Remove-vRNIDataSource {
   <#
   .SYNOPSIS
   Removes a datasource from vRealize Network Insight
@@ -1118,15 +1084,15 @@ function Remove-vRNIDataSource
   #>
 
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
-      # Datasource object, gotten from Get-vRNIDataSource
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$DataSource,
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Datasource object, gotten from Get-vRNIDataSource
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$DataSource,
 
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   process {
@@ -1142,8 +1108,7 @@ function Remove-vRNIDataSource
 }
 
 
-function Update-vRNIDataSource
-{
+function Update-vRNIDataSource {
   <#
   .SYNOPSIS
   Updates the configuration of a datasource from vRealize Network Insight
@@ -1166,35 +1131,35 @@ function Update-vRNIDataSource
   #>
 
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
-      # Datasource object, gotten from Get-vRNIDataSource
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$DataSource,
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Datasource object, gotten from Get-vRNIDataSource
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$DataSource,
 
-    [Parameter (Mandatory=$false)]
-      # Nickname for the datasource
-      [ValidateNotNullOrEmpty()]
-      [string]$Nickname="",
+    [Parameter (Mandatory = $false)]
+    # Nickname for the datasource
+    [ValidateNotNullOrEmpty()]
+    [string]$Nickname = "",
 
-    [Parameter (Mandatory=$false)]
-      # Username to use to login to the datasource
-      [ValidateNotNullOrEmpty()]
-      [string]$Username = "",
+    [Parameter (Mandatory = $false)]
+    # Username to use to login to the datasource
+    [ValidateNotNullOrEmpty()]
+    [string]$Username = "",
 
-    [Parameter (Mandatory=$false)]
-      # Password to use to login to the datasource
-      [ValidateNotNullOrEmpty()]
-      [string]$Password = "",
+    [Parameter (Mandatory = $false)]
+    # Password to use to login to the datasource
+    [ValidateNotNullOrEmpty()]
+    [string]$Password = "",
 
-    [Parameter (Mandatory=$false)]
-      # Optional notes for the datasource
-      [ValidateNotNullOrEmpty()]
-      [string]$Notes="",
+    [Parameter (Mandatory = $false)]
+    # Optional notes for the datasource
+    [ValidateNotNullOrEmpty()]
+    [string]$Notes = "",
 
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   process {
@@ -1219,7 +1184,7 @@ function Update-vRNIDataSource
         $oThisDatasource.credentials.password = $Password
       }
       if ($Notes -ne "") {
-        if($null -eq $oThisDatasource.notes) {
+        if ($null -eq $oThisDatasource.notes) {
           $oThisDatasource | Add-Member -MemberType NoteProperty -Name 'notes' -Value $Notes
         }
         else {
@@ -1236,8 +1201,7 @@ function Update-vRNIDataSource
 }
 
 
-function Update-vRNINSXvControllerClusterPassword
-{
+function Update-vRNINSXvControllerClusterPassword {
   <#
   .SYNOPSIS
   Updates the NSX-v Controller Cluster password and enabled data collection. Needed for routing information on NSX-v.
@@ -1255,25 +1219,25 @@ function Update-vRNINSXvControllerClusterPassword
   #>
 
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
-      # Datasource object, gotten from Get-vRNIDataSource
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$DataSource,
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Datasource object, gotten from Get-vRNIDataSource
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$DataSource,
 
-    [Parameter (Mandatory=$True)]
-      # Controller Cluster Password
-      [ValidateNotNullOrEmpty()]
-      [string]$Password,
+    [Parameter (Mandatory = $True)]
+    # Controller Cluster Password
+    [ValidateNotNullOrEmpty()]
+    [string]$Password,
 
-    [Parameter (Mandatory=$False)]
-      # Enable data collection from
-      [ValidateNotNullOrEmpty()]
-      [bool]$Enabled = $True,
+    [Parameter (Mandatory = $False)]
+    # Enable data collection from
+    [ValidateNotNullOrEmpty()]
+    [bool]$Enabled = $True,
 
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   process {
@@ -1281,12 +1245,12 @@ function Update-vRNINSXvControllerClusterPassword
     $DataSource | Foreach-Object {
       $oThisDatasource = $_
 
-      if($oThisDatasource.entity_type -ne "NSXVManagerDataSource") {
+      if ($oThisDatasource.entity_type -ne "NSXVManagerDataSource") {
         throw "Given data source is not a NSX-v data source! $($oThisDatasource)"
       }
 
       $requestFormat = @{
-        "enabled" = $Enabled
+        "enabled"             = $Enabled
         "controller_password" = $Password
       }
 
@@ -1298,8 +1262,7 @@ function Update-vRNINSXvControllerClusterPassword
   } ## end process
 }
 
-function Update-vRNIDataSourceData
-{
+function Update-vRNIDataSourceData {
   <#
   .SYNOPSIS
   Updates the user-assisted-networking-information data (zip file) of a generic switch or router datasource
@@ -1316,20 +1279,20 @@ function Update-vRNIDataSourceData
   #>
 
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
-      # Datasource object, gotten from Get-vRNIDataSource
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$DataSource,
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Datasource object, gotten from Get-vRNIDataSource
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$DataSource,
 
-    [Parameter (Mandatory=$True)]
-      # The zipfile with the contents for UANI
-      [ValidateNotNullOrEmpty()]
-      [string]$Zipfile,
+    [Parameter (Mandatory = $True)]
+    # The zipfile with the contents for UANI
+    [ValidateNotNullOrEmpty()]
+    [string]$Zipfile,
 
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   process {
@@ -1339,11 +1302,11 @@ function Update-vRNIDataSourceData
 
       $URI = "/api/ni$($Script:DatasourceInternalURLs.$($oThisDatasource.entity_type))/$($oThisDatasource.entity_id)/data"
 
-      $fileName     = Split-Path $Zipfile -leaf
-      $zipContents  = [IO.File]::ReadAllBytes($Zipfile)
+      $fileName = Split-Path $Zipfile -leaf
+      $zipContents = [IO.File]::ReadAllBytes($Zipfile)
       $usedEncoding = [System.Text.Encoding]::GetEncoding("ISO-8859-1")
       $fileEncoding = $usedEncoding.GetString($zipContents)
-      $boundary     = [System.Guid]::NewGuid().ToString();
+      $boundary = [System.Guid]::NewGuid().ToString();
       $LF = "`r`n";
 
       $requestBody = (
@@ -1359,8 +1322,7 @@ function Update-vRNIDataSourceData
   } ## end process
 }
 
-function Enable-vRNIDataSource
-{
+function Enable-vRNIDataSource {
   <#
   .SYNOPSIS
   Enables an existing datasources within vRealize Network Insight
@@ -1383,15 +1345,15 @@ function Enable-vRNIDataSource
   #>
 
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
-      # Datasource object, gotten from Get-vRNIDataSource
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$DataSource,
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Datasource object, gotten from Get-vRNIDataSource
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$DataSource,
 
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   process {
@@ -1406,8 +1368,7 @@ function Enable-vRNIDataSource
   } ## end Process
 }
 
-function Disable-vRNIDataSource
-{
+function Disable-vRNIDataSource {
   <#
   .SYNOPSIS
   Disables an existing datasources within vRealize Network Insight
@@ -1430,15 +1391,15 @@ function Disable-vRNIDataSource
   #>
 
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
-      # Datasource object, gotten from Get-vRNIDataSource
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$DataSource,
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Datasource object, gotten from Get-vRNIDataSource
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$DataSource,
 
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   process {
@@ -1455,8 +1416,7 @@ function Disable-vRNIDataSource
 
 
 
-function Get-vRNIDataSourceSNMPConfig
-{
+function Get-vRNIDataSourceSNMPConfig {
   <#
   .SYNOPSIS
   Retrieves the SNMP configuration of a switch datasource from vRealize Network Insight
@@ -1472,15 +1432,15 @@ function Get-vRNIDataSourceSNMPConfig
   #>
 
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
-      # Datasource object, gotten from Get-vRNIDataSource
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$DataSource,
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Datasource object, gotten from Get-vRNIDataSource
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$DataSource,
 
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   process {
@@ -1488,12 +1448,11 @@ function Get-vRNIDataSourceSNMPConfig
       $oThisDatasource = $_
 
       # Sanity check on the data source type: only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP config
-      if($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
+      if ($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "BrocadeSwitchDataSource" -And $oThisDatasource.entity_type -ne "JuniperSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource" -And
         $oThisDatasource.entity_type -ne "CiscoACIDataSource" -And $oThisDatasource.entity_type -ne "HuaweiSwitchDataSource" -And
-        $oThisDatasource.entity_type -ne "F5BIGIPDataSource")
-      {
+        $oThisDatasource.entity_type -ne "F5BIGIPDataSource") {
         throw "Invalid Data Source Type ($($oThisDatasource.entity_type)) for SNMP. Only Cisco, Dell, Brocade, Juniper, Arista, F5, Huawei & UCS have SNMP configuration."
       }
 
@@ -1506,8 +1465,7 @@ function Get-vRNIDataSourceSNMPConfig
   } ## end process
 }
 
-function Set-vRNIDataSourceSNMPConfig
-{
+function Set-vRNIDataSourceSNMPConfig {
   <#
   .SYNOPSIS
   Updates the SNMP configuration of a switch or UCS datasource within vRealize Network Insight
@@ -1528,55 +1486,55 @@ function Set-vRNIDataSourceSNMPConfig
 
   #>
 
-  [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
+  [CmdletBinding(DefaultParameterSetName = "__AllParameterSets")]
 
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
-      # Datasource object, gotten from Get-vRNIDataSource
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$DataSource,
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Datasource object, gotten from Get-vRNIDataSource
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$DataSource,
 
-    [Parameter (Mandatory=$false)]
-      # Enable SNMP?
-      [ValidateNotNullOrEmpty()]
-      [bool]$Enabled = $true,
+    [Parameter (Mandatory = $false)]
+    # Enable SNMP?
+    [ValidateNotNullOrEmpty()]
+    [bool]$Enabled = $true,
 
     # This param is only required when configuring SNMP v2c
-    [Parameter (Mandatory=$true, ParameterSetName="SNMPv2c")]
-      # SNMP v2c Community string
-      [ValidateNotNullOrEmpty()]
-      [string]$Community,
+    [Parameter (Mandatory = $true, ParameterSetName = "SNMPv2c")]
+    # SNMP v2c Community string
+    [ValidateNotNullOrEmpty()]
+    [string]$Community,
 
     # These params are only required when configuring SNMP v3
-    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
-      # SNMP v3 Username
-      [ValidateNotNullOrEmpty()]
-      [string]$Username,
-    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
-      # SNMP v3 Context name
-      [ValidateNotNullOrEmpty()]
-      [string]$ContextName,
-    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
-      # SNMP v3 Context name
-      [ValidateSet ("MD5", "SHA", "NO_AUTH")]
-      [string]$AuthenticationType,
-    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
-      # SNMP v3 Authentication Password
-      [ValidateNotNullOrEmpty()]
-      [string]$AuthenticationPassword,
-    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
-      # SNMP v3 Privacy Type
-      [ValidateSet ("AES", "DES", "AES128", "AES192", "AES256", "3DES", "NO_PRIV")]
-      [string]$PrivacyType,
-    [Parameter (Mandatory=$true, ParameterSetName="SNMPv3")]
-      # SNMP v3 Privacy Password
-      [ValidateNotNullOrEmpty()]
-      [string]$PrivacyPassword,
+    [Parameter (Mandatory = $true, ParameterSetName = "SNMPv3")]
+    # SNMP v3 Username
+    [ValidateNotNullOrEmpty()]
+    [string]$Username,
+    [Parameter (Mandatory = $true, ParameterSetName = "SNMPv3")]
+    # SNMP v3 Context name
+    [ValidateNotNullOrEmpty()]
+    [string]$ContextName,
+    [Parameter (Mandatory = $true, ParameterSetName = "SNMPv3")]
+    # SNMP v3 Context name
+    [ValidateSet ("MD5", "SHA", "NO_AUTH")]
+    [string]$AuthenticationType,
+    [Parameter (Mandatory = $true, ParameterSetName = "SNMPv3")]
+    # SNMP v3 Authentication Password
+    [ValidateNotNullOrEmpty()]
+    [string]$AuthenticationPassword,
+    [Parameter (Mandatory = $true, ParameterSetName = "SNMPv3")]
+    # SNMP v3 Privacy Type
+    [ValidateSet ("AES", "DES", "AES128", "AES192", "AES256", "3DES", "NO_PRIV")]
+    [string]$PrivacyType,
+    [Parameter (Mandatory = $true, ParameterSetName = "SNMPv3")]
+    # SNMP v3 Privacy Password
+    [ValidateNotNullOrEmpty()]
+    [string]$PrivacyPassword,
 
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   process {
@@ -1585,7 +1543,7 @@ function Set-vRNIDataSourceSNMPConfig
 
       # Sanity check on the data source type: only Cisco, Dell, Brocade, Juniper, Arista switches & UCS have SNMP config
 
-      if($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
+      if ($oThisDatasource.entity_type -ne "CiscoSwitchDataSource" -And $oThisDatasource.entity_type -ne "DellSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "BrocadeSwitchDataSource" -And $oThisDatasource.entity_type -ne "JuniperSwitchDataSource" -And
         $oThisDatasource.entity_type -ne "AristaSwitchDataSource" -And $oThisDatasource.entity_type -ne "UCSManagerDataSource" -And
         $oThisDatasource.entity_type -ne "F5BIGIPDataSource" -And $oThisDatasource.entity_type -ne "HuaweiSwitchDataSource") {
@@ -1609,12 +1567,12 @@ function Set-vRNIDataSourceSNMPConfig
       if ($pscmdlet.ParameterSetName -eq "SNMPv3") {
         $requestFormat.snmp_version = "v3"
         $requestFormat.config_snmp_3 = @{
-          "username" = $Username
-          "context_name" = $ContextName
-          "authentication_type" = $AuthenticationType
+          "username"                = $Username
+          "context_name"            = $ContextName
+          "authentication_type"     = $AuthenticationType
           "authentication_password" = $AuthenticationPassword
-          "privacy_type" = $PrivacyType
-          "privacy_password" = $PrivacyPassword
+          "privacy_type"            = $PrivacyType
+          "privacy_password"        = $PrivacyPassword
         }
       }
 
@@ -1635,8 +1593,7 @@ function Set-vRNIDataSourceSNMPConfig
 #####################################################################################################################
 #####################################################################################################################
 
-function Get-vRNIApplication
-{
+function Get-vRNIApplication {
   <#
   .SYNOPSIS
   Get Application information from vRealize Network Insight.
@@ -1662,11 +1619,11 @@ function Get-vRNIApplication
   Get only the application details of the application named "3 Tier App"
   #>
   param (
-    [Parameter(Mandatory=$false, Position=1, ParameterSetName = 'Filter')]
-      [string[]] $Name,
-    [Parameter(Mandatory=$false)]
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject] $Connection = $defaultvRNIConnection
+    [Parameter(Mandatory = $false, Position = 1, ParameterSetName = 'Filter')]
+    [string[]] $Name,
+    [Parameter(Mandatory = $false)]
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject] $Connection = $defaultvRNIConnection
   )
 
   $applications = [System.Collections.ArrayList]@()
@@ -1674,8 +1631,8 @@ function Get-vRNIApplication
   $size = 50
   $listParams = @{
     Connection = $Connection
-    Method = 'GET'
-    Uri = "/api/ni/groups/applications?size=$size"
+    Method     = 'GET'
+    Uri        = "/api/ni/groups/applications?size=$size"
   }
 
   # If a filter has been given, use the search endpoint to more efficiently find the right applications
@@ -1713,11 +1670,9 @@ function Get-vRNIApplication
     $listParams['Body'] = $body | ConvertTo-Json
     Write-Verbose ('Body: ' + $listParams['Body'])
   } ## end if ($PSCmdlet.ParameterSetName -eq 'Filter')
-  else
-  {
+  else {
     # With version 1.1.0 of the API - there's a single endpoint to retrieve all
-    if($Script:vRNI_API_Version -ge [System.Version]"1.1.0")
-    {
+    if ($Script:vRNI_API_Version -ge [System.Version]"1.1.0") {
       $listParams['Uri'] = '/api/ni/groups/applications/fetch?size=2500'
       $applications = Invoke-vRNIRestMethod @listParams
       $applications.results
@@ -1727,8 +1682,7 @@ function Get-vRNIApplication
 
   $hasMoreData = $true
   $counter = 0
-  while ($hasMoreData)
-  {
+  while ($hasMoreData) {
     $applicationResponse = Invoke-vRNIRestMethod @listParams
 
     Write-Verbose ("$($applicationResponse.total_count) applications to process")
@@ -1736,8 +1690,7 @@ function Get-vRNIApplication
       $listParams['Uri'] += "&cursor=$($applicationResponse.cursor)"
     }
 
-    foreach($app in $applicationResponse.results)
-    {
+    foreach ($app in $applicationResponse.results) {
       # Retrieve application details and store them
       $app_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($app.entity_id)"
       $applications.Add($app_info) | Out-Null
@@ -1758,8 +1711,7 @@ function Get-vRNIApplication
   $applications
 }
 
-function Get-vRNIApplicationMemberVM
-{
+function Get-vRNIApplicationMemberVM {
   <#
   .SYNOPSIS
   Get a list of VMs in an application from vRealize Network Insight.
@@ -1775,18 +1727,17 @@ function Get-vRNIApplicationMemberVM
   Show the member VMs for the application called "My3TierApp"
   #>
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true)]
-      # Application object, gotten from Get-vRNIApplication
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$Application,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true)]
+    # Application object, gotten from Get-vRNIApplication
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$Application,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
-  process
-  {
+  process {
     ## do Foreach-Object, so as to enable user to pass multiple Application objects for value of -Application parameter
     $Application | Foreach-Object {
       $oThisApplication = $_
@@ -1797,8 +1748,7 @@ function Get-vRNIApplicationMemberVM
   } ## end process
 }
 
-function Get-vRNIApplicationTier
-{
+function Get-vRNIApplicationTier {
   <#
   .SYNOPSIS
   Get Application Tier information from vRealize Network Insight.
@@ -1814,17 +1764,17 @@ function Get-vRNIApplicationTier
   Show the tiers for the application container called "My3TierApp"
   #>
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true)]
-      # Application object, gotten from Get-vRNIApplication
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$Application,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned to a specific name
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true)]
+    # Application object, gotten from Get-vRNIApplication
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$Application,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned to a specific name
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   process {
@@ -1838,25 +1788,23 @@ function Get-vRNIApplicationTier
       # Use this as a results container
       $tiers = [System.Collections.ArrayList]@()
 
-      foreach($tier in $tier_list.results)
-      {
+      foreach ($tier in $tier_list.results) {
         # Retrieve application details and store them
         $tier_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($oThisApplication.entity_id)/tiers/$($tier.entity_id)"
         $tiers.Add($tier_info) | Out-Null
 
         # Don't go on if we've already found the one the user wants specifically
-        if($Name -eq $tier_info.name) {break}
+        if ($Name -eq $tier_info.name) { break }
       }
 
       # Filter out other application tiers if the user wants one specifically
-      if ($Name) {$tiers | Where-Object { $_.name -eq $Name }}
-      else {$tiers}
+      if ($Name) { $tiers | Where-Object { $_.name -eq $Name } }
+      else { $tiers }
     } ## end Foreach-Object
   } ## end process
 }
 
-function New-vRNIApplicationTier
-{
+function New-vRNIApplicationTier {
   <#
   .SYNOPSIS
   Create a Tier in an Application container in vRealize Network Insight.
@@ -1897,39 +1845,39 @@ function New-vRNIApplicationTier
   #>
 
   # To keep backwards compatibility with 1.0
-  [CmdletBinding(DefaultParameterSetName="VMFilter")]
+  [CmdletBinding(DefaultParameterSetName = "VMFilter")]
 
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true)]
-      # Application object, gotten from Get-vRNIApplication
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$Application,
-    [Parameter (Mandatory=$true)]
-      # The name of the new tier
-      [string]$Name,
-    [Parameter (Mandatory=$false, ParameterSetName="VMFilter")]
-      # The VM filters in the new tier
-      [string[]]$Filters,
-    [Parameter (Mandatory=$false, ParameterSetName="MultipleFilters")]
-      # The VM filters in the new tier
-      [string[]]$VMFilters,
-    [Parameter (Mandatory=$false, ParameterSetName="IPFilters")]
-      # The IP set filters in the new tier
-      [string[]]$IPFilters,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true)]
+    # Application object, gotten from Get-vRNIApplication
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$Application,
+    [Parameter (Mandatory = $true)]
+    # The name of the new tier
+    [string]$Name,
+    [Parameter (Mandatory = $false, ParameterSetName = "VMFilter")]
+    # The VM filters in the new tier
+    [string[]]$Filters,
+    [Parameter (Mandatory = $false, ParameterSetName = "MultipleFilters")]
+    # The VM filters in the new tier
+    [string[]]$VMFilters,
+    [Parameter (Mandatory = $false, ParameterSetName = "IPFilters")]
+    # The IP set filters in the new tier
+    [string[]]$IPFilters,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   begin {
-    if(!$Filters -And !$VMFilters -And !$IPFilters) {
+    if (!$Filters -And !$VMFilters -And !$IPFilters) {
       throw "Please provide at least one filter."
     }
 
     # Format request with all given data
     $requestFormat = @{
-      "name" = $Name
+      "name"                      = $Name
       "group_membership_criteria" = @()
     }
 
@@ -1939,30 +1887,26 @@ function New-vRNIApplicationTier
     }
 
     # If supplied, go through the VM filters and build the call
-    if($VMFilters)
-    {
-      foreach($filter in $VMFilters)
-      {
-        $criteria_record = @{}
+    if ($VMFilters) {
+      foreach ($filter in $VMFilters) {
+        $criteria_record = @{ }
         $criteria_record.membership_type = "SearchMembershipCriteria"
         $criteria_record.search_membership_criteria = @{
           "entity_type" = "BaseVirtualMachine"
-          "filter" = $filter
+          "filter"      = $filter
         }
         $requestFormat.group_membership_criteria += $criteria_record
       }
     }
 
     # If supplied, go through the IP filters and build the call
-    if($IPFilters)
-    {
-      $criteria_record = @{}
+    if ($IPFilters) {
+      $criteria_record = @{ }
       $criteria_record.membership_type = "IPAddressMembershipCriteria"
-      $criteria_record.ip_address_membership_criteria = @{}
+      $criteria_record.ip_address_membership_criteria = @{ }
       $criteria_record.ip_address_membership_criteria.ip_addresses = @()
 
-      foreach($ipset in $IPFilters)
-      {
+      foreach ($ipset in $IPFilters) {
         $criteria_record.ip_address_membership_criteria.ip_addresses += $ipset
       }
 
@@ -1984,8 +1928,7 @@ function New-vRNIApplicationTier
 }
 
 
-function Remove-vRNIApplicationTier
-{
+function Remove-vRNIApplicationTier {
   <#
   .SYNOPSIS
   Remove a tier from an application container from vRealize Network Insight.
@@ -2001,14 +1944,14 @@ function Remove-vRNIApplicationTier
   Remove the tier 'web-tier' from the application container called "My3TierApp"
   #>
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
-      # Application Tier object, gotten from Get-vRNIApplicationTier
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$ApplicationTier,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Application Tier object, gotten from Get-vRNIApplicationTier
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$ApplicationTier,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   process {
@@ -2020,8 +1963,7 @@ function Remove-vRNIApplicationTier
   } ## end process
 }
 
-function New-vRNIApplication
-{
+function New-vRNIApplication {
   <#
   .SYNOPSIS
   Create a new Application container inside vRealize Network Insight.
@@ -2037,13 +1979,13 @@ function New-vRNIApplication
   Create a new application container with the name My3TierApp.
   #>
   param (
-    [Parameter (Mandatory=$false, Position=1)]
-      # Give the application a name
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Give the application a name
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Format request with all given data
@@ -2059,8 +2001,7 @@ function New-vRNIApplication
 }
 
 
-function Remove-vRNIApplication
-{
+function Remove-vRNIApplication {
   <#
   .SYNOPSIS
   Remove an Application container from vRealize Network Insight.
@@ -2076,14 +2017,14 @@ function Remove-vRNIApplication
   Remove the application container called "My3TierApp"
   #>
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
-      # Application object, gotten from Get-vRNIApplication
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$Application,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Application object, gotten from Get-vRNIApplication
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$Application,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   process {
@@ -2101,8 +2042,7 @@ function Remove-vRNIApplication
 #####################################################################################################################
 #####################################################################################################################
 
-function Get-vRNIEntity
-{
+function Get-vRNIEntity {
   <#
   .SYNOPSIS
   Get available entities from vRealize Network Insight.
@@ -2121,25 +2061,25 @@ function Get-vRNIEntity
   Get the entity object for the hypervisor host called "esxi01.lab"
   #>
   param (
-    [Parameter (Mandatory=$true)]
-      # Limit the amount of records returned
-      [string]$Entity_URI,
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to start looking up records
-      [int]$StartTime = 0,
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to stop looking up records
-      [int]$EndTime = 0,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true)]
+    # Limit the amount of records returned
+    [string]$Entity_URI,
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $false, ParameterSetName = "TIMELIMIT")]
+    # The epoch timestamp of when to start looking up records
+    [int]$StartTime = 0,
+    [Parameter (Mandatory = $false, ParameterSetName = "TIMELIMIT")]
+    # The epoch timestamp of when to stop looking up records
+    [int]$EndTime = 0,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Use this as a results container
@@ -2152,19 +2092,18 @@ function Get-vRNIEntity
   $cursor = ""
   $finished = $false
 
-  while(!$finished)
-  {
+  while (!$finished) {
     $using_params = 0
     # This is the base URI for the problems
     $URI = "/api/ni/entities/$($Entity_URI)"
-    if($size -gt 0 -And $cursor -ne "") {
+    if ($size -gt 0 -And $cursor -ne "") {
       $URI += "?size=$($size)&cursor=$($cursor)"
       $using_params++
     }
 
     # Check if we want to limit the results to a time window
-    if($PSCmdlet.ParameterSetName -eq "TIMELIMIT" -And ($StartTime -gt 0 -And $EndTime -gt 0)) {
-      if($using_params -gt 0) {
+    if ($PSCmdlet.ParameterSetName -eq "TIMELIMIT" -And ($StartTime -gt 0 -And $EndTime -gt 0)) {
+      if ($using_params -gt 0) {
         $URI += "&start_time=$($StartTime)&end_time=$($EndTime)"
         $using_params++
       }
@@ -2178,16 +2117,16 @@ function Get-vRNIEntity
 
     $listParams = @{
       Connection = $Connection
-      Method = 'GET'
-      URI = $URI
+      Method     = 'GET'
+      URI        = $URI
     }
 
     # support filtering by a VM by using search instead of returning all entities
     if ($PSBoundParameters.ContainsKey('Name') -and $Name -ne '') {
       $listParams['URI'] = '/api/ni/search'
       $listParams['Body'] = @{
-         entity_type = $Script:EntityURLtoIdMapping.$Entity_URI
-        filter = "Name = '$Name'"
+        entity_type = $Script:EntityURLtoIdMapping.$Entity_URI
+        filter      = "Name = '$Name'"
       } | ConvertTo-Json
       $listParams['Method'] = 'POST'
     }
@@ -2196,30 +2135,27 @@ function Get-vRNIEntity
     $entity_list = Invoke-vRNIRestMethod @listParams
 
     # If we're not finished, store information about the run for next use
-    if($finished -eq $false)
-    {
+    if ($finished -eq $false) {
       $total_count = $entity_list.total_count
-      $cursor      = $entity_list.cursor
+      $cursor = $entity_list.cursor
     }
 
     # If the size is smaller than 10 (decreased by previous run), or the size is greater than the total records, finish up
-    if($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
+    if ($size -lt 10 -Or ($total_count -gt 0 -And $size -gt $total_count)) {
       $finished = $true
     }
 
     # If we're using version 1.1.0 or greater of the vRNI API - we can use the /entities/fetch bulk method of getting entity details. Much more efficient.
-    if($Script:vRNI_API_Version -ge [System.Version]"1.1.0")
-    {
+    if ($Script:vRNI_API_Version -ge [System.Version]"1.1.0") {
       $requestFormat = @{
         "entity_ids" = $entity_list.results
       }
       $requestBody = ConvertTo-Json $requestFormat
       $entity_info = Invoke-vRNIRestMethod -Connection $Connection -Method POST -URI "/api/ni/entities/fetch" -Body $requestBody
 
-      foreach($entity in $entity_info.results)
-      {
+      foreach ($entity in $entity_info.results) {
         # If we're retrieving flows, add the time of the main flow to this specific flow record
-        if($Entity_URI -eq "flows") {
+        if ($Entity_URI -eq "flows") {
           $entity.entity | Add-Member -Name "time" -value $entity.time -MemberType NoteProperty
         }
         $entity = $entity.entity
@@ -2228,14 +2164,14 @@ function Get-vRNIEntity
         $current_count++
 
         # If we are limiting the output, break from the loops and return results
-        if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
+        if ($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
           $finished = $true
           break
         }
       }
 
       # Check remaining items, if it's less than the default size, reduce the next page size
-      if($size -gt ($total_count - $current_count)) {
+      if ($size -gt ($total_count - $current_count)) {
         $size = ($total_count - $current_count)
       }
 
@@ -2244,13 +2180,12 @@ function Get-vRNIEntity
     }
 
     # Go through the entities individually and store them in the results array
-    foreach($sg in $entity_list.results)
-    {
+    foreach ($sg in $entity_list.results) {
       # Retrieve entity details and store them
       $entity_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/$($Entity_URI)/$($sg.entity_id)?time=$($sg.time)"
 
       # If we're retrieving flows, add the time of the main flow to this specific flow record
-      if($Entity_URI -eq "flows") {
+      if ($Entity_URI -eq "flows") {
         $entity_info | Add-Member -Name "time" -value $sg.time -MemberType NoteProperty
       }
 
@@ -2258,14 +2193,14 @@ function Get-vRNIEntity
       $current_count++
 
       # If we are limiting the output, break from the loops and return results
-      if($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
+      if ($Limit -ne 0 -And ($Limit -lt $current_count -Or $Limit -eq $current_count)) {
         $finished = $true
         break
       }
     } ## end foreach($sg in $entity_list.results)
 
     # Check remaining items, if it's less than the default size, reduce the next page size
-    if($size -gt ($total_count - $current_count)) {
+    if ($size -gt ($total_count - $current_count)) {
       $size = ($total_count - $current_count)
     }
 
@@ -2281,8 +2216,7 @@ function Get-vRNIEntity
 }
 
 
-function Get-vRNIEntityName
-{
+function Get-vRNIEntityName {
   <#
   .SYNOPSIS
   Translate an entity id to a name in vRealize Network Insight.
@@ -2297,13 +2231,13 @@ function Get-vRNIEntityName
   Get the name of the entity with ID 14307:562:1274720802
   #>
   param (
-    [Parameter (Mandatory=$true, Position=1)]
-      # The entity ID to resolve to a name
-      [string]$EntityID,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true, Position = 1)]
+    # The entity ID to resolve to a name
+    [string]$EntityID,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Invoke-vRNIRestMethod with the proper URI to get the entity results
@@ -2311,8 +2245,7 @@ function Get-vRNIEntityName
   $result
 }
 
-function Get-vRNIEntityNames
-{
+function Get-vRNIEntityNames {
   <#
   .SYNOPSIS
   Translate an array of entity ids to names in vRealize Network Insight.
@@ -2327,26 +2260,25 @@ function Get-vRNIEntityNames
   Get the name of the entity with ID 14307:562:1274720802 and 14307:562:1274720803
   #>
   param (
-    [Parameter (Mandatory=$true, Position=1)]
-      # The entity IDs to resolve to a name
-      [string[]]$EntityIDs,
-    [Parameter (Mandatory=$true, Position=2)]
-      # The entity type to resolve to a name
-      [string[]]$EntityType,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true, Position = 1)]
+    # The entity IDs to resolve to a name
+    [string[]]$EntityIDs,
+    [Parameter (Mandatory = $true, Position = 2)]
+    # The entity type to resolve to a name
+    [string[]]$EntityType,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   $requestFormat = @{
     "entity_ids" = @()
   }
 
-  foreach($entityID in $EntityIDs)
-  {
+  foreach ($entityID in $EntityIDs) {
     $record = @{
-      "entity_id" = $entityID
+      "entity_id"   = $entityID
       "entity_type" = $EntityType
     }
 
@@ -2359,8 +2291,7 @@ function Get-vRNIEntityNames
   $entity_info.results
 }
 
-function Get-vRNIProblem
-{
+function Get-vRNIProblem {
   <#
   .SYNOPSIS
   Get open problems from vRealize Network Insight.
@@ -2385,19 +2316,19 @@ function Get-vRNIProblem
   Get all problems that have been open in the last 10 minutes.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to start looking up records
-      [int]$StartTime = 0,
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to stop looking up records
-      [int]$EndTime = 0,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, ParameterSetName = "TIMELIMIT")]
+    # The epoch timestamp of when to start looking up records
+    [int]$StartTime = 0,
+    [Parameter (Mandatory = $false, ParameterSetName = "TIMELIMIT")]
+    # The epoch timestamp of when to stop looking up records
+    [int]$EndTime = 0,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2406,8 +2337,7 @@ function Get-vRNIProblem
 }
 
 
-function Get-vRNIFlow
-{
+function Get-vRNIFlow {
   <#
   .SYNOPSIS
   Get network flows from vRealize Network Insight.
@@ -2439,24 +2369,24 @@ function Get-vRNIFlow
   Get only internet-based (in or out) flows that occurred in the last 10 minutes.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 100,
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to start looking up records
-      [int]$StartTime = 0,
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to stop looking up records
-      [int]$EndTime = 0,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 100,
+    [Parameter (Mandatory = $false, ParameterSetName = "TIMELIMIT")]
+    # The epoch timestamp of when to start looking up records
+    [int]$StartTime = 0,
+    [Parameter (Mandatory = $false, ParameterSetName = "TIMELIMIT")]
+    # The epoch timestamp of when to stop looking up records
+    [int]$EndTime = 0,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # If we want to select flows in a time slot, make sure the end time is later then the start time
-  if($PSCmdlet.ParameterSetName -eq "TIMELIMIT") {
-    if($StartTime -gt $EndTime) {
+  if ($PSCmdlet.ParameterSetName -eq "TIMELIMIT") {
+    if ($StartTime -gt $EndTime) {
       throw "Param StartTime cannot be greater than EndTime"
     }
   }
@@ -2467,8 +2397,7 @@ function Get-vRNIFlow
 }
 
 
-function Get-vRNIKubernetesServices
-{
+function Get-vRNIKubernetesServices {
   <#
   .SYNOPSIS
   Get Kubernetes Services from vRealize Network Insight.
@@ -2486,16 +2415,16 @@ function Get-vRNIKubernetesServices
   Retrieve only the Kubernetes Service object called "my-k8s-service"
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2509,8 +2438,7 @@ function Get-vRNIKubernetesServices
 #----------------------------------------------------------------------------------------------------------------#
 #----------------------------------------------------------------------------------------------------------------#
 
-function Get-vRNIVM
-{
+function Get-vRNIVM {
   <#
   .SYNOPSIS
   Get virtual machines from vRealize Network Insight.
@@ -2533,16 +2461,16 @@ function Get-vRNIVM
   Get all VMs that are attached to the vCenter named "vcenter.lab"
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2550,8 +2478,7 @@ function Get-vRNIVM
   $results
 }
 
-function Get-vRNIVMvNIC
-{
+function Get-vRNIVMvNIC {
   <#
   .SYNOPSIS
   Get virtual machine vnics from vRealize Network Insight.
@@ -2565,16 +2492,16 @@ function Get-vRNIVMvNIC
   List all VM vNICs in your vRNI environment (note: this may take a while if you have a lot of VMs)
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2588,8 +2515,7 @@ function Get-vRNIVMvNIC
 #----------------------------------------------------------------------------------------------------------------#
 #----------------------------------------------------------------------------------------------------------------#
 
-function Get-vRNIvCenter
-{
+function Get-vRNIvCenter {
   <#
   .SYNOPSIS
   Get configured vCenter instances from vRealize Network Insight.
@@ -2607,16 +2533,16 @@ function Get-vRNIvCenter
   Retrieve the vCenter object for the one called "vcenter.lab"
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2624,8 +2550,7 @@ function Get-vRNIvCenter
   $results
 }
 
-function Get-vRNIvCenterFolder
-{
+function Get-vRNIvCenterFolder {
   <#
   .SYNOPSIS
   Get available vCenter folders from vRealize Network Insight.
@@ -2639,16 +2564,16 @@ function Get-vRNIvCenterFolder
   Get all vCenter folders in the vRNI environment.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2656,8 +2581,7 @@ function Get-vRNIvCenterFolder
   $results
 }
 
-function Get-vRNIvCenterDatacenter
-{
+function Get-vRNIvCenterDatacenter {
   <#
   .SYNOPSIS
   Get available vCenter Datacenters from vRealize Network Insight.
@@ -2671,16 +2595,16 @@ function Get-vRNIvCenterDatacenter
   Get all vCenter Datacenters in the vRNI environment.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2688,8 +2612,7 @@ function Get-vRNIvCenterDatacenter
   $results
 }
 
-function Get-vRNIvCenterCluster
-{
+function Get-vRNIvCenterCluster {
   <#
   .SYNOPSIS
   Get available vCenter Clusters from vRealize Network Insight.
@@ -2703,16 +2626,16 @@ function Get-vRNIvCenterCluster
   Get all vCenter Clusters in the vRNI environment.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2725,8 +2648,7 @@ function Get-vRNIvCenterCluster
 #-------------------------------------- ESXi host Entities ------------------------------------------------------#
 #----------------------------------------------------------------------------------------------------------------#
 #----------------------------------------------------------------------------------------------------------------#
-function Get-vRNIHost
-{
+function Get-vRNIHost {
   <#
   .SYNOPSIS
   Get available hypervisor hosts from vRealize Network Insight.
@@ -2752,16 +2674,16 @@ function Get-vRNIHost
   Get all hosts that are managed by a NSX Manager.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2769,8 +2691,7 @@ function Get-vRNIHost
   $results
 }
 
-function Get-vRNIHostVMKNic
-{
+function Get-vRNIHostVMKNic {
   <#
   .SYNOPSIS
   Get available host vmknics from vRealize Network Insight.
@@ -2784,16 +2705,16 @@ function Get-vRNIHostVMKNic
   Get all host vmknics in the vRNI environment.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2807,8 +2728,7 @@ function Get-vRNIHostVMKNic
 #----------------------------------------------------------------------------------------------------------------#
 #----------------------------------------------------------------------------------------------------------------#
 
-function Get-vRNISecurityGroup
-{
+function Get-vRNISecurityGroup {
   <#
   .SYNOPSIS
   Get available security groups (SG) from vRealize Network Insight.
@@ -2826,16 +2746,16 @@ function Get-vRNISecurityGroup
   Retrieve the security group object for the one called "3TA-Management-Access"
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2843,8 +2763,7 @@ function Get-vRNISecurityGroup
   $results
 }
 
-function Get-vRNISecurityTag
-{
+function Get-vRNISecurityTag {
   <#
   .SYNOPSIS
   Get available security tags (ST) from vRealize Network Insight.
@@ -2862,16 +2781,16 @@ function Get-vRNISecurityTag
   Retrieve the security tag object for the one called "ST-3TA-Management"
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2879,8 +2798,7 @@ function Get-vRNISecurityTag
   $results
 }
 
-function Get-vRNIIPSet
-{
+function Get-vRNIIPSet {
   <#
   .SYNOPSIS
   Get available NSX IP Sets from vRealize Network Insight.
@@ -2894,16 +2812,16 @@ function Get-vRNIIPSet
   Get all IP Sets in the vRNI environment.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2911,8 +2829,7 @@ function Get-vRNIIPSet
   $results
 }
 
-function Get-vRNIService
-{
+function Get-vRNIService {
   <#
   .SYNOPSIS
   Get available NSX Services from vRealize Network Insight.
@@ -2926,16 +2843,16 @@ function Get-vRNIService
   Get all NSX Services in the vRNI environment.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2943,8 +2860,7 @@ function Get-vRNIService
   $results
 }
 
-function Get-vRNIServiceGroup
-{
+function Get-vRNIServiceGroup {
   <#
   .SYNOPSIS
   Get available NSX Service Groups from vRealize Network Insight.
@@ -2958,16 +2874,16 @@ function Get-vRNIServiceGroup
   Get all NSX Service Groups in the vRNI environment.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -2975,8 +2891,7 @@ function Get-vRNIServiceGroup
   $results
 }
 
-function Get-vRNINSXManager
-{
+function Get-vRNINSXManager {
   <#
   .SYNOPSIS
   Get available NSX Managers from vRealize Network Insight.
@@ -2990,16 +2905,16 @@ function Get-vRNINSXManager
   Get all NSX Managers in the vRNI environment.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -3013,8 +2928,7 @@ function Get-vRNINSXManager
 #----------------------------------------------------------------------------------------------------------------#
 #----------------------------------------------------------------------------------------------------------------#
 
-function Get-vRNIFirewallRule
-{
+function Get-vRNIFirewallRule {
   <#
   .SYNOPSIS
   Get available firewall rules from vRealize Network Insight.
@@ -3028,16 +2942,16 @@ function Get-vRNIFirewallRule
   Get all firewall rules in the vRNI environment.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -3045,8 +2959,7 @@ function Get-vRNIFirewallRule
   $results
 }
 
-function Get-vRNIL2Network
-{
+function Get-vRNIL2Network {
   <#
   .SYNOPSIS
   Get available layer 2 networks from vRealize Network Insight.
@@ -3064,16 +2977,16 @@ function Get-vRNIL2Network
   Only show all VXLAN layer 2 networks.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -3081,8 +2994,7 @@ function Get-vRNIL2Network
   $results
 }
 
-function Get-vRNIDistributedSwitch
-{
+function Get-vRNIDistributedSwitch {
   <#
   .SYNOPSIS
   Get available vSphere Distributed Switches from vRealize Network Insight.
@@ -3101,16 +3013,16 @@ function Get-vRNIDistributedSwitch
 
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -3118,8 +3030,7 @@ function Get-vRNIDistributedSwitch
   $results
 }
 
-function Get-vRNIDistributedSwitchPortGroup
-{
+function Get-vRNIDistributedSwitchPortGroup {
   <#
   .SYNOPSIS
   Get available VDS Portgroups from vRealize Network Insight.
@@ -3137,16 +3048,16 @@ function Get-vRNIDistributedSwitchPortGroup
   Get only the portgroup called 'Web-Tier'
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -3154,8 +3065,7 @@ function Get-vRNIDistributedSwitchPortGroup
   $results
 }
 
-function Get-vRNICheckPointManagers
-{
+function Get-vRNICheckPointManagers {
   <#
   .SYNOPSIS
   Get available CheckPoint Firewall Managers from vRealize Network Insight.
@@ -3173,16 +3083,16 @@ function Get-vRNICheckPointManagers
   Get only the CheckPoint Firewall Managers called 'CP01'
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -3196,8 +3106,7 @@ function Get-vRNICheckPointManagers
 #----------------------------------------------------------------------------------------------------------------#
 #----------------------------------------------------------------------------------------------------------------#
 
-function Get-vRNIDatastore
-{
+function Get-vRNIDatastore {
   <#
   .SYNOPSIS
   Get available datastores from vRealize Network Insight.
@@ -3211,16 +3120,16 @@ function Get-vRNIDatastore
   Get all datastores in the vRNI environment.
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Limit the amount of records returned
-      [int]$Limit = 0,
-    [Parameter (Mandatory=$false, Position=1)]
-      # Limit the amount of records returned
-      [string]$Name = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
@@ -3234,8 +3143,7 @@ function Get-vRNIDatastore
 #####################################################################################################################
 #####################################################################################################################
 
-function Get-vRNIRecommendedRules
-{
+function Get-vRNIRecommendedRules {
   <#
   .SYNOPSIS
   Retrieve the recommended firewall rules of a specific application.
@@ -3262,29 +3170,27 @@ function Get-vRNIRecommendedRules
   called 'vRNI' from analysis on the last 7 days.
   #>
   param (
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to start looking up records
-      [int]$StartTime = 0,
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to stop looking up records
-      [int]$EndTime = 0,
-    [Parameter (Mandatory=$false)]
-      # The application entity ID for which to retrieve the recommended rules
-      [string]$ApplicationID = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false, ParameterSetName = "TIMELIMIT")]
+    # The epoch timestamp of when to start looking up records
+    [int]$StartTime = 0,
+    [Parameter (Mandatory = $false, ParameterSetName = "TIMELIMIT")]
+    # The epoch timestamp of when to stop looking up records
+    [int]$EndTime = 0,
+    [Parameter (Mandatory = $false)]
+    # The application entity ID for which to retrieve the recommended rules
+    [string]$ApplicationID = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
-  if($PSCmdlet.ParameterSetName -eq "TIMELIMIT" -And ($StartTime -gt 0 -And $EndTime -gt 0))
-  {
-    if($StartTime -gt $EndTime) {
+  if ($PSCmdlet.ParameterSetName -eq "TIMELIMIT" -And ($StartTime -gt 0 -And $EndTime -gt 0)) {
+    if ($StartTime -gt $EndTime) {
       throw "StartTime cannot be greated than EndTime"
     }
   }
-  else
-  {
+  else {
     # Use a timeframe of 14 days by default
     $twoWeeksAgo = (Get-Date).AddDays(-14)
     $StartTime = [int][double]::Parse((Get-Date -Date $twoWeeksAgo -UFormat %s))
@@ -3295,15 +3201,15 @@ function Get-vRNIRecommendedRules
 
   # Format request with all given data
   $requestFormat = @{
-    "group_1" = @{
+    "group_1"    = @{
       "entity" = @{
         "entity_type" = "Application"
-        "entity_id" = $ApplicationID
+        "entity_id"   = $ApplicationID
       }
     }
     "time_range" = @{
       "start_time" = $StartTime
-      "end_time" = $EndTime
+      "end_time"   = $EndTime
     }
   }
 
@@ -3315,8 +3221,7 @@ function Get-vRNIRecommendedRules
 }
 
 
-function Get-vRNIRecommendedRulesNsxBundle
-{
+function Get-vRNIRecommendedRulesNsxBundle {
   <#
   .SYNOPSIS
   Retrieve the recommended firewall rules of a specific application bundled in the NSX-v format for
@@ -3344,32 +3249,30 @@ function Get-vRNIRecommendedRulesNsxBundle
   called 'vRNI' from analysis on the last 7 days.
   #>
   param (
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to start looking up records
-      [int]$StartTime = 0,
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to stop looking up records
-      [int]$EndTime = 0,
-    [Parameter (Mandatory=$false)]
-      # The application entity ID for which to retrieve the recommended rules
-      [string]$ApplicationID = "",
-    [Parameter (Mandatory=$true)]
-      # This cmdlet outputs a zip file specified by the filename here
-      [string]$OutFile,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false, ParameterSetName = "TIMELIMIT")]
+    # The epoch timestamp of when to start looking up records
+    [int]$StartTime = 0,
+    [Parameter (Mandatory = $false, ParameterSetName = "TIMELIMIT")]
+    # The epoch timestamp of when to stop looking up records
+    [int]$EndTime = 0,
+    [Parameter (Mandatory = $false)]
+    # The application entity ID for which to retrieve the recommended rules
+    [string]$ApplicationID = "",
+    [Parameter (Mandatory = $true)]
+    # This cmdlet outputs a zip file specified by the filename here
+    [string]$OutFile,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
-  if($PSCmdlet.ParameterSetName -eq "TIMELIMIT" -And ($StartTime -gt 0 -And $EndTime -gt 0))
-  {
-    if($StartTime -gt $EndTime) {
+  if ($PSCmdlet.ParameterSetName -eq "TIMELIMIT" -And ($StartTime -gt 0 -And $EndTime -gt 0)) {
+    if ($StartTime -gt $EndTime) {
       throw "StartTime cannot be greated than EndTime"
     }
   }
-  else
-  {
+  else {
     # Use a timeframe of 14 days by default
     $twoWeeksAgo = (Get-Date).AddDays(-14)
     $StartTime = [int][double]::Parse((Get-Date -Date $twoWeeksAgo -UFormat %s))
@@ -3380,15 +3283,15 @@ function Get-vRNIRecommendedRulesNsxBundle
 
   # Format request with all given data
   $requestFormat = @{
-    "group_1" = @{
+    "group_1"    = @{
       "entity" = @{
         "entity_type" = "Application"
-        "entity_id" = $ApplicationID
+        "entity_id"   = $ApplicationID
       }
     }
     "time_range" = @{
       "start_time" = $StartTime
-      "end_time" = $EndTime
+      "end_time"   = $EndTime
     }
   }
 
@@ -3404,8 +3307,7 @@ function Get-vRNIRecommendedRulesNsxBundle
 #####################################################################################################################
 
 
-function New-vRNISubnetMapping
-{
+function New-vRNISubnetMapping {
   <#
   .SYNOPSIS
   Create a new IP Subnet to VLAN ID mapping within vRealize Network Insight.
@@ -3425,21 +3327,21 @@ function New-vRNISubnetMapping
 
   #>
   param (
-    [Parameter (Mandatory=$true)]
-      # The VLAN ID for this mapping
-      [int]$VLANID,
-    [Parameter (Mandatory=$true)]
-      # The CIDR mapped to the given VLAN ID
-      [string]$CIDR,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true)]
+    # The VLAN ID for this mapping
+    [int]$VLANID,
+    [Parameter (Mandatory = $true)]
+    # The CIDR mapped to the given VLAN ID
+    [string]$CIDR,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Format request with all given data
   $requestFormat = @{
-    "cidr" = $CIDR
+    "cidr"    = $CIDR
     "vlan_id" = $VLANID
   }
 
@@ -3448,8 +3350,7 @@ function New-vRNISubnetMapping
   Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/subnet-mappings" -Body $requestBody
 }
 
-function Get-vRNISubnetMapping
-{
+function Get-vRNISubnetMapping {
   <#
   .SYNOPSIS
   Retrieve all IP Subnet to VLAN ID mappings within vRealize Network Insight.
@@ -3466,18 +3367,17 @@ function Get-vRNISubnetMapping
 
   #>
   param (
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   $results = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri "/api/ni/settings/subnet-mappings"
   return $results.results
 }
 
-function Get-vRNIEastWestIP
-{
+function Get-vRNIEastWestIP {
   <#
   .SYNOPSIS
   Retrieve all East-West IP mappings within vRealize Network Insight.
@@ -3492,18 +3392,17 @@ function Get-vRNIEastWestIP
 
   #>
   param (
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   $results = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri "/api/ni/settings/ip-tags/EAST_WEST"
   return $results
 }
 
-function Add-vRNIEastWestIP
-{
+function Add-vRNIEastWestIP {
   <#
   .SYNOPSIS
   Adds a new East-West IP mapping within vRealize Network Insight.
@@ -3521,38 +3420,36 @@ function Add-vRNIEastWestIP
 
   #>
   param (
-    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
-      # The subnet to add to the IP mappings
-      [string]$Subnet,
-    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
-      # The IP range start to add to the IP mappings
-      [string]$IP_Range_Start,
-    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
-      # The IP range end to add to the IP mappings
-      [string]$IP_Range_End,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true, ParameterSetName = "PS_Subnet")]
+    # The subnet to add to the IP mappings
+    [string]$Subnet,
+    [Parameter (Mandatory = $true, ParameterSetName = "PS_IP_Range")]
+    # The IP range start to add to the IP mappings
+    [string]$IP_Range_Start,
+    [Parameter (Mandatory = $true, ParameterSetName = "PS_IP_Range")]
+    # The IP range end to add to the IP mappings
+    [string]$IP_Range_End,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Format request with all given data
   $requestFormat = ""
-  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
-  {
+  if ($PSCmdlet.ParameterSetName -eq "PS_Subnet") {
     $requestFormat = @{
-      "tag_id" = "EAST_WEST"
+      "tag_id"  = "EAST_WEST"
       "subnets" = @($Subnet)
     }
   }
-  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
-  {
+  if ($PSCmdlet.ParameterSetName -eq "PS_IP_Range") {
     $requestFormat = @{
-      "tag_id" = "EAST_WEST"
+      "tag_id"            = "EAST_WEST"
       "ip_address_ranges" = @( @{
-        "start_ip" = $IP_Range_Start
-        "end_ip" = $IP_Range_End
-      } )
+          "start_ip" = $IP_Range_Start
+          "end_ip"   = $IP_Range_End
+        } )
     }
   }
 
@@ -3562,8 +3459,7 @@ function Add-vRNIEastWestIP
   return $results
 }
 
-function Remove-vRNIEastWestIP
-{
+function Remove-vRNIEastWestIP {
   <#
   .SYNOPSIS
   Removes a East-West IP mapping within vRealize Network Insight.
@@ -3581,38 +3477,36 @@ function Remove-vRNIEastWestIP
 
   #>
   param (
-    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
-      # The subnet to remove from the IP mappings
-      [string]$Subnet,
-    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
-      # The IP range start to remove from the IP mappings
-      [string]$IP_Range_Start,
-    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
-      # The IP range end to remove from the IP mappings
-      [string]$IP_Range_End,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true, ParameterSetName = "PS_Subnet")]
+    # The subnet to remove from the IP mappings
+    [string]$Subnet,
+    [Parameter (Mandatory = $true, ParameterSetName = "PS_IP_Range")]
+    # The IP range start to remove from the IP mappings
+    [string]$IP_Range_Start,
+    [Parameter (Mandatory = $true, ParameterSetName = "PS_IP_Range")]
+    # The IP range end to remove from the IP mappings
+    [string]$IP_Range_End,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Format request with all given data
   $requestFormat = ""
-  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
-  {
+  if ($PSCmdlet.ParameterSetName -eq "PS_Subnet") {
     $requestFormat = @{
-      "tag_id" = "EAST_WEST"
+      "tag_id"  = "EAST_WEST"
       "subnets" = @($Subnet)
     }
   }
-  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
-  {
+  if ($PSCmdlet.ParameterSetName -eq "PS_IP_Range") {
     $requestFormat = @{
-      "tag_id" = "EAST_WEST"
+      "tag_id"            = "EAST_WEST"
       "ip_address_ranges" = @( @{
-        "start_ip" = $IP_Range_Start
-        "end_ip" = $IP_Range_End
-      } )
+          "start_ip" = $IP_Range_Start
+          "end_ip"   = $IP_Range_End
+        } )
     }
   }
 
@@ -3622,8 +3516,7 @@ function Remove-vRNIEastWestIP
   return $results
 }
 
-function Get-vRNINorthSouthIP
-{
+function Get-vRNINorthSouthIP {
   <#
   .SYNOPSIS
   Retrieve all North-South IP mappings within vRealize Network Insight.
@@ -3638,18 +3531,17 @@ function Get-vRNINorthSouthIP
 
   #>
   param (
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   $results = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri "/api/ni/settings/ip-tags/INTERNET"
   return $results
 }
 
-function Add-vRNINorthSouthIP
-{
+function Add-vRNINorthSouthIP {
   <#
   .SYNOPSIS
   Add a new North-South IP mapping within vRealize Network Insight.
@@ -3667,38 +3559,36 @@ function Add-vRNINorthSouthIP
 
   #>
   param (
-    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
-      # The subnet to add to the IP mappings
-      [string]$Subnet,
-    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
-      # The IP range start to add to the IP mappings
-      [string]$IP_Range_Start,
-    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
-      # The IP range end to add to the IP mappings
-      [string]$IP_Range_End,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true, ParameterSetName = "PS_Subnet")]
+    # The subnet to add to the IP mappings
+    [string]$Subnet,
+    [Parameter (Mandatory = $true, ParameterSetName = "PS_IP_Range")]
+    # The IP range start to add to the IP mappings
+    [string]$IP_Range_Start,
+    [Parameter (Mandatory = $true, ParameterSetName = "PS_IP_Range")]
+    # The IP range end to add to the IP mappings
+    [string]$IP_Range_End,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Format request with all given data
   $requestFormat = ""
-  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
-  {
+  if ($PSCmdlet.ParameterSetName -eq "PS_Subnet") {
     $requestFormat = @{
-      "tag_id" = "INTERNET"
+      "tag_id"  = "INTERNET"
       "subnets" = @($Subnet)
     }
   }
-  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
-  {
+  if ($PSCmdlet.ParameterSetName -eq "PS_IP_Range") {
     $requestFormat = @{
-      "tag_id" = "INTERNET"
+      "tag_id"            = "INTERNET"
       "ip_address_ranges" = @( @{
-        "start_ip" = $IP_Range_Start
-        "end_ip" = $IP_Range_End
-      } )
+          "start_ip" = $IP_Range_Start
+          "end_ip"   = $IP_Range_End
+        } )
     }
   }
 
@@ -3708,8 +3598,7 @@ function Add-vRNINorthSouthIP
   return $results
 }
 
-function Remove-vRNINorthSouthIP
-{
+function Remove-vRNINorthSouthIP {
   <#
   .SYNOPSIS
   Remove a North-South IP mapping within vRealize Network Insight.
@@ -3727,38 +3616,36 @@ function Remove-vRNINorthSouthIP
 
   #>
   param (
-    [Parameter (Mandatory=$true, ParameterSetName="PS_Subnet")]
-      # The subnet to remove from the IP mappings
-      [string]$Subnet,
-    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
-      # The IP range start to remove from the IP mappings
-      [string]$IP_Range_Start,
-    [Parameter (Mandatory=$true, ParameterSetName="PS_IP_Range")]
-      # The IP range end to remove from the IP mappings
-      [string]$IP_Range_End,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true, ParameterSetName = "PS_Subnet")]
+    # The subnet to remove from the IP mappings
+    [string]$Subnet,
+    [Parameter (Mandatory = $true, ParameterSetName = "PS_IP_Range")]
+    # The IP range start to remove from the IP mappings
+    [string]$IP_Range_Start,
+    [Parameter (Mandatory = $true, ParameterSetName = "PS_IP_Range")]
+    # The IP range end to remove from the IP mappings
+    [string]$IP_Range_End,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Format request with all given data
   $requestFormat = ""
-  if($PSCmdlet.ParameterSetName -eq "PS_Subnet")
-  {
+  if ($PSCmdlet.ParameterSetName -eq "PS_Subnet") {
     $requestFormat = @{
-      "tag_id" = "INTERNET"
+      "tag_id"  = "INTERNET"
       "subnets" = @($Subnet)
     }
   }
-  if($PSCmdlet.ParameterSetName -eq "PS_IP_Range")
-  {
+  if ($PSCmdlet.ParameterSetName -eq "PS_IP_Range") {
     $requestFormat = @{
-      "tag_id" = "INTERNET"
+      "tag_id"            = "INTERNET"
       "ip_address_ranges" = @( @{
-        "start_ip" = $IP_Range_Start
-        "end_ip" = $IP_Range_End
-      } )
+          "start_ip" = $IP_Range_Start
+          "end_ip"   = $IP_Range_End
+        } )
     }
   }
 
@@ -3768,8 +3655,7 @@ function Remove-vRNINorthSouthIP
   return $results
 }
 
-function Get-vRNIAuditLogs
-{
+function Get-vRNIAuditLogs {
   <#
   .SYNOPSIS
   Retrieve audit logs from Network Insight
@@ -3790,22 +3676,22 @@ function Get-vRNIAuditLogs
 
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Filter on username
-      [string]$Username = "",
-    [Parameter (Mandatory=$false)]
-      # Filter on a specific operation (like LOGIN, UPDATE)
-      [string]$Operation = "",
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to start looking up records
-      [int]$StartTime = 0,
-    [Parameter (Mandatory=$false, ParameterSetName="TIMELIMIT")]
-      # The epoch timestamp of when to stop looking up records
-      [int]$EndTime = 0,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Filter on username
+    [string]$Username = "",
+    [Parameter (Mandatory = $false)]
+    # Filter on a specific operation (like LOGIN, UPDATE)
+    [string]$Operation = "",
+    [Parameter (Mandatory = $false, ParameterSetName = "TIMELIMIT")]
+    # The epoch timestamp of when to start looking up records
+    [int]$StartTime = 0,
+    [Parameter (Mandatory = $false, ParameterSetName = "TIMELIMIT")]
+    # The epoch timestamp of when to stop looking up records
+    [int]$EndTime = 0,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # A list to collect the log records in
@@ -3813,38 +3699,37 @@ function Get-vRNIAuditLogs
 
   # Initialise the body
   $body = @{
-    size =  50
+    size = 50
   }
 
   # Filter on specific details, if given via params
-  if($Username -ne "") {
+  if ($Username -ne "") {
     $body['username'] = $Username
   }
-  if($Operation -ne "") {
+  if ($Operation -ne "") {
     $body['operation'] = $Operation
   }
 
   # Add a time range, if specified in the params
-  if($PSCmdlet.ParameterSetName -eq "TIMELIMIT" -And ($StartTime -gt 0 -And $EndTime -gt 0)) {
+  if ($PSCmdlet.ParameterSetName -eq "TIMELIMIT" -And ($StartTime -gt 0 -And $EndTime -gt 0)) {
     $body['time_range'] = @{
       start_time = $StartTime
-      end_time = $EndTime
+      end_time   = $EndTime
     }
   }
 
   # Initialise the RestMethod params
   $listParams = @{
     Connection = $Connection
-    Method = 'POST'
-    Uri = "/api/ni/logs/audit"
-    Body = $body | ConvertTo-Json
+    Method     = 'POST'
+    Uri        = "/api/ni/logs/audit"
+    Body       = $body | ConvertTo-Json
   }
 
   # Loop through the log pages, as it uses pagination to return only a restrict set
   $hasMoreData = $true
   $counter = 0
-  while ($hasMoreData)
-  {
+  while ($hasMoreData) {
     $logsResponse = Invoke-vRNIRestMethod @listParams
 
     Write-Verbose ("$($logsResponse.total_count) logs to process")
@@ -3854,8 +3739,7 @@ function Get-vRNIAuditLogs
     }
 
     # Save results
-    foreach($log_record in $logsResponse.results)
-    {
+    foreach ($log_record in $logsResponse.results) {
       $logs.Add($log_record) | Out-Null
       $counter++
     }
@@ -3881,8 +3765,7 @@ function Get-vRNIAuditLogs
 #####################################################################################################################
 #####################################################################################################################
 
-function Get-vRNISettingsVIDM
-{
+function Get-vRNISettingsVIDM {
   <#
   .SYNOPSIS
   Retrieve vIDM settings from Network Insight
@@ -3898,18 +3781,17 @@ function Get-vRNISettingsVIDM
 
   #>
   param (
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   $result = Invoke-vRNIRestMethod -Connection $Connection -Method "GET" -Uri "/api/ni/settings/vidm"
   $result
 }
 
-function Set-vRNISettingsVIDM
-{
+function Set-vRNISettingsVIDM {
   <#
   .SYNOPSIS
   Retrieve vIDM settings from Network Insight
@@ -3925,47 +3807,46 @@ function Set-vRNISettingsVIDM
 
   #>
   param (
-    [Parameter (Mandatory=$true)]
-      # vIDM Appliance hostname
-      [string]$Appliance,
-    [Parameter (Mandatory=$true)]
-      # vIDM OAuth2 Client ID
-      [string]$ClientID,
-    [Parameter (Mandatory=$true)]
-      # vIDM OAuth2 Client Secret
-      [string]$ClientSecret,
-    [Parameter (Mandatory=$false)]
-      # Optional vIDM OAuth2 SHA Thumbprint
-      [string]$SHA_Thumbprint = "",
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true)]
+    # vIDM Appliance hostname
+    [string]$Appliance,
+    [Parameter (Mandatory = $true)]
+    # vIDM OAuth2 Client ID
+    [string]$ClientID,
+    [Parameter (Mandatory = $true)]
+    # vIDM OAuth2 Client Secret
+    [string]$ClientSecret,
+    [Parameter (Mandatory = $false)]
+    # Optional vIDM OAuth2 SHA Thumbprint
+    [string]$SHA_Thumbprint = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Initialise the body
   $body = @{
     vidm_appliance = $Appliance
-    client_id = $ClientID
-    client_secret = $ClientSecret
+    client_id      = $ClientID
+    client_secret  = $ClientSecret
     sha_thumbprint = $SHA_Thumbprint
-    enable = $true
+    enable         = $true
   }
 
   # Initialise the RestMethod params
   $listParams = @{
     Connection = $Connection
-    Method = 'POST'
-    Uri = "/api/ni/settings/vidm"
-    Body = $body | ConvertTo-Json
+    Method     = 'POST'
+    Uri        = "/api/ni/settings/vidm"
+    Body       = $body | ConvertTo-Json
   }
 
   $result = Invoke-vRNIRestMethod @listParams
   $result
 }
 
-function Get-vRNISettingsUserGroup
-{
+function Get-vRNISettingsUserGroup {
   <#
   .SYNOPSIS
   Retrieve user groups settings from Network Insight
@@ -3982,22 +3863,21 @@ function Get-vRNISettingsUserGroup
 
   #>
   param (
-    [Parameter (Mandatory=$true)]
-      [ValidateSet ("LDAP", "LOCAL", "VIDM")]
-      # Group type; where is the group from?
-      [string]$Type,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true)]
+    [ValidateSet ("LDAP", "LOCAL", "VIDM")]
+    # Group type; where is the group from?
+    [string]$Type,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   $result = Invoke-vRNIRestMethod -Connection $Connection -Method "GET" -Uri "/api/ni/settings/user-groups?type=$($Type)"
   $result.results
 }
 
-function Set-vRNISettingsUserGroup
-{
+function Set-vRNISettingsUserGroup {
   <#
   .SYNOPSIS
   Configure user group role mappings.
@@ -4017,47 +3897,46 @@ function Set-vRNISettingsUserGroup
 
   #>
   param (
-    [Parameter (Mandatory=$true)]
-      # Type user group (only VIDM supported for now)
-      [ValidateSet ("VIDM")]
-      [string]$Type,
-    [Parameter (Mandatory=$true)]
-      # Name of the group in vIDM
-      [string]$Group,
-    [Parameter (Mandatory=$true)]
-      # Domain in vIDM that this group belongs to
-      [string]$Domain,
-    [Parameter (Mandatory=$true)]
-      # Role that this group will get in vRNI
-      [ValidateSet ("ADMIN", "MEMBER")]
-      [string]$Role,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true)]
+    # Type user group (only VIDM supported for now)
+    [ValidateSet ("VIDM")]
+    [string]$Type,
+    [Parameter (Mandatory = $true)]
+    # Name of the group in vIDM
+    [string]$Group,
+    [Parameter (Mandatory = $true)]
+    # Domain in vIDM that this group belongs to
+    [string]$Domain,
+    [Parameter (Mandatory = $true)]
+    # Role that this group will get in vRNI
+    [ValidateSet ("ADMIN", "MEMBER")]
+    [string]$Role,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Initialise the body
   $body = @{
     group_name = $Group
-    domain = $Domain
-    role = $Role
+    domain     = $Domain
+    role       = $Role
   }
 
   # Initialise the RestMethod params
   $listParams = @{
     Connection = $Connection
-    Method = 'POST'
-    Uri = "/api/ni/settings/user-groups/vidm"
-    Body = $body | ConvertTo-Json
+    Method     = 'POST'
+    Uri        = "/api/ni/settings/user-groups/vidm"
+    Body       = $body | ConvertTo-Json
   }
 
   $result = Invoke-vRNIRestMethod @listParams
   $result
 }
 
-function Remove-vRNISettingsUserGroup
-{
+function Remove-vRNISettingsUserGroup {
   <#
   .SYNOPSIS
   Removes a user group mapping from vRealize Network Insight
@@ -4073,14 +3952,14 @@ function Remove-vRNISettingsUserGroup
   #>
 
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
-      # Datasource object, gotten from Get-vRNISettingsUserGroup
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$Group,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Datasource object, gotten from Get-vRNISettingsUserGroup
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$Group,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   process {
@@ -4095,8 +3974,7 @@ function Remove-vRNISettingsUserGroup
   } ## end process
 }
 
-function Get-vRNISettingsUser
-{
+function Get-vRNISettingsUser {
   <#
   .SYNOPSIS
   Retrieve users role mappings from Network Insight
@@ -4113,22 +3991,21 @@ function Get-vRNISettingsUser
 
   #>
   param (
-    [Parameter (Mandatory=$true)]
-      [ValidateSet ("LDAP", "LOCAL", "VIDM")]
-      # User type; where is the group from?
-      [string]$Type,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true)]
+    [ValidateSet ("LDAP", "LOCAL", "VIDM")]
+    # User type; where is the group from?
+    [string]$Type,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   $result = Invoke-vRNIRestMethod -Connection $Connection -Method "GET" -Uri "/api/ni/settings/users?type=$($Type)"
   $result.results
 }
 
-function Set-vRNISettingsUser
-{
+function Set-vRNISettingsUser {
   <#
   .SYNOPSIS
   Configure a user role mapping from Network Insight
@@ -4148,40 +4025,40 @@ function Set-vRNISettingsUser
 
   #>
   param (
-    [Parameter (Mandatory=$true)]
-      # Type user group (only VIDM supported for now)
-      [ValidateSet ("VIDM")]
-      [string]$Type,
-    [Parameter (Mandatory=$true)]
-      # Username in vIDM
-      [string]$Username,
-    [Parameter (Mandatory=$true)]
-      # Domain in vIDM that this user belongs to
-      [string]$Domain,
-    [Parameter (Mandatory=$true)]
-      # Role that this user will get in vRNI
-      [ValidateSet ("ADMIN", "MEMBER")]
-      [string]$Role,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true)]
+    # Type user group (only VIDM supported for now)
+    [ValidateSet ("VIDM")]
+    [string]$Type,
+    [Parameter (Mandatory = $true)]
+    # Username in vIDM
+    [string]$Username,
+    [Parameter (Mandatory = $true)]
+    # Domain in vIDM that this user belongs to
+    [string]$Domain,
+    [Parameter (Mandatory = $true)]
+    # Role that this user will get in vRNI
+    [ValidateSet ("ADMIN", "MEMBER")]
+    [string]$Role,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Initialise the body
   $body = @{
-    username = $Username
-    domain = $Domain
-    role = $Role
+    username     = $Username
+    domain       = $Domain
+    role         = $Role
     display_name = $Username
   }
 
   # Initialise the RestMethod params
   $listParams = @{
     Connection = $Connection
-    Method = 'POST'
-    Uri = "/api/ni/settings/users/vidm"
-    Body = $body | ConvertTo-Json
+    Method     = 'POST'
+    Uri        = "/api/ni/settings/users/vidm"
+    Body       = $body | ConvertTo-Json
   }
 
   $result = Invoke-vRNIRestMethod @listParams
@@ -4189,8 +4066,7 @@ function Set-vRNISettingsUser
 }
 
 
-function Set-vRNIUserPassword
-{
+function Set-vRNIUserPassword {
   <#
   .SYNOPSIS
   Change the password of a local user to Network Insight
@@ -4219,34 +4095,32 @@ function Set-vRNIUserPassword
   PS C:\>  Set-vRNIUserPassword -Credentials $new_cred
   #>
   param (
-    [Parameter (Mandatory=$false)]
-      # Username in 'admin@local' format
-      [string]$Username,
-    [Parameter (Mandatory=$false)]
-      # Their new password
-      [string]$NewPassword,
-    [Parameter (Mandatory=$false)]
-      # PSCredential object containing credentials to update
-      [PSCredential]$Credential,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $false)]
+    # Username in 'admin@local' format
+    [string]$Username,
+    [Parameter (Mandatory = $false)]
+    # Their new password
+    [string]$NewPassword,
+    [Parameter (Mandatory = $false)]
+    # PSCredential object containing credentials to update
+    [PSCredential]$Credential,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   # Make sure either -Credential is set, or both -Username and -Password
-  if(($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Username")) -Or
-     ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("NewPassword")))
-  {
+  if (($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Username")) -Or
+    ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("NewPassword"))) {
     throw "Specify either -Credential or -Username to pass the new password (if using -Username and omitting -NewPassword, a prompt will be given)"
   }
 
   # Build cred object for default auth if user specified username/pass
   $user_credentials = ""
-  if($PsBoundParameters.ContainsKey("Username"))
-  {
+  if ($PsBoundParameters.ContainsKey("Username")) {
     # Is the -Password omitted? Prompt securely
-    if(!$PsBoundParameters.ContainsKey("NewPassword")) {
+    if (!$PsBoundParameters.ContainsKey("NewPassword")) {
       $user_credentials = Get-Credential -UserName $Username -Message "Input the new password"
     }
     # If the password has been given in cleartext,
@@ -4255,35 +4129,33 @@ function Set-vRNIUserPassword
     }
   }
   # If a credential object was given as a parameter, use that
-  elseif($PSBoundParameters.ContainsKey("Credential"))
-  {
+  elseif ($PSBoundParameters.ContainsKey("Credential")) {
     $user_credentials = $Credential
   }
   # If no -Username or -Credential was given, prompt for credentials
-  elseif(!$PSBoundParameters.ContainsKey("Credential")) {
+  elseif (!$PSBoundParameters.ContainsKey("Credential")) {
     $user_credentials = Get-Credential -Message "Input the username and new password"
   }
 
   # Initialise the body
   $body = @{
-    "username" = $user_credentials.Username
+    "username"     = $user_credentials.Username
     "new_password" = $user_credentials.GetNetworkCredential().Password
   }
 
   # Initialise the RestMethod params
   $listParams = @{
     Connection = $Connection
-    Method = 'PUT'
-    Uri = "/api/ni/settings/users/password"
-    Body = $body | ConvertTo-Json
+    Method     = 'PUT'
+    Uri        = "/api/ni/settings/users/password"
+    Body       = $body | ConvertTo-Json
   }
 
   $result = Invoke-vRNIRestMethod @listParams
   $result
 }
 
-function Remove-vRNISettingsUser
-{
+function Remove-vRNISettingsUser {
   <#
   .SYNOPSIS
   Remove a user role mapping from Network Insight
@@ -4301,14 +4173,14 @@ function Remove-vRNISettingsUser
   #>
 
   param (
-    [Parameter (Mandatory=$true, ValueFromPipeline=$true, Position=1)]
-      # Datasource object, gotten from Get-vRNISettingsUser
-      [ValidateNotNullOrEmpty()]
-      [PSObject]$User,
-    [Parameter (Mandatory=$False)]
-      # vRNI Connection object
-      [ValidateNotNullOrEmpty()]
-      [PSCustomObject]$Connection=$defaultvRNIConnection
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Datasource object, gotten from Get-vRNISettingsUser
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$User,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
   )
 
   process {
@@ -4325,7 +4197,7 @@ function Remove-vRNISettingsUser
 
 
 function New-DynamicParameter {
-<#
+  <#
   .NOTES
   Credits to jrich523 and ramblingcookiemonster for their initial code and inspiration:
       https://github.com/RamblingCookieMonster/PowerShell/blob/master/New-DynamicParam.ps1
@@ -4336,262 +4208,262 @@ function New-DynamicParameter {
   [CmdletBinding(PositionalBinding = $false, DefaultParameterSetName = 'DynamicParameter')]
   Param
   (
-      [Parameter(Mandatory = $true, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [ValidateNotNullOrEmpty()]
-      [string]$Name,
+    [Parameter(Mandatory = $true, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [ValidateNotNullOrEmpty()]
+    [string]$Name,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [System.Type]$Type = [int],
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [System.Type]$Type = [int],
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [string[]]$Alias,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [string[]]$Alias,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [switch]$Mandatory,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [switch]$Mandatory,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [int]$Position,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [int]$Position,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [string]$HelpMessage,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [string]$HelpMessage,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [switch]$DontShow,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [switch]$DontShow,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [switch]$ValueFromPipeline,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [switch]$ValueFromPipeline,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [switch]$ValueFromPipelineByPropertyName,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [switch]$ValueFromPipelineByPropertyName,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [switch]$ValueFromRemainingArguments,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [switch]$ValueFromRemainingArguments,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [string]$ParameterSetName = '__AllParameterSets',
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [string]$ParameterSetName = '__AllParameterSets',
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [switch]$AllowNull,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [switch]$AllowNull,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [switch]$AllowEmptyString,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [switch]$AllowEmptyString,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [switch]$AllowEmptyCollection,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [switch]$AllowEmptyCollection,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [switch]$ValidateNotNull,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [switch]$ValidateNotNull,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [switch]$ValidateNotNullOrEmpty,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [switch]$ValidateNotNullOrEmpty,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [ValidateCount(2, 2)]
-      [int[]]$ValidateCount,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [ValidateCount(2, 2)]
+    [int[]]$ValidateCount,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [ValidateCount(2, 2)]
-      [int[]]$ValidateRange,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [ValidateCount(2, 2)]
+    [int[]]$ValidateRange,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [ValidateCount(2, 2)]
-      [int[]]$ValidateLength,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [ValidateCount(2, 2)]
+    [int[]]$ValidateLength,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [ValidateNotNullOrEmpty()]
-      [string]$ValidatePattern,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [ValidateNotNullOrEmpty()]
+    [string]$ValidatePattern,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [ValidateNotNullOrEmpty()]
-      [scriptblock]$ValidateScript,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [ValidateNotNullOrEmpty()]
+    [scriptblock]$ValidateScript,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [ValidateNotNullOrEmpty()]
-      [string[]]$ValidateSet,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [ValidateNotNullOrEmpty()]
+    [string[]]$ValidateSet,
 
-      [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
-      [ValidateNotNullOrEmpty()]
-      [ValidateScript( {
-              if (!($_ -is [System.Management.Automation.RuntimeDefinedParameterDictionary])) {
-                  Throw 'Dictionary must be a System.Management.Automation.RuntimeDefinedParameterDictionary object'
-              }
-              $true
-          })]
-      $Dictionary = $false,
+    [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'DynamicParameter')]
+    [ValidateNotNullOrEmpty()]
+    [ValidateScript( {
+        if (!($_ -is [System.Management.Automation.RuntimeDefinedParameterDictionary])) {
+          Throw 'Dictionary must be a System.Management.Automation.RuntimeDefinedParameterDictionary object'
+        }
+        $true
+      })]
+    $Dictionary = $false,
 
-      [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true, ParameterSetName = 'CreateVariables')]
-      [switch]$CreateVariables,
+    [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true, ParameterSetName = 'CreateVariables')]
+    [switch]$CreateVariables,
 
-      [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true, ParameterSetName = 'CreateVariables')]
-      [ValidateNotNullOrEmpty()]
-      [ValidateScript( {
-              # System.Management.Automation.PSBoundParametersDictionary is an internal sealed class,
-              # so one can't use PowerShell's '-is' operator to validate type.
-              if ($_.GetType().Name -ne 'PSBoundParametersDictionary') {
-                  Throw 'BoundParameters must be a System.Management.Automation.PSBoundParametersDictionary object'
-              }
-              $true
-          })]
-      $BoundParameters
+    [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName = $true, ParameterSetName = 'CreateVariables')]
+    [ValidateNotNullOrEmpty()]
+    [ValidateScript( {
+        # System.Management.Automation.PSBoundParametersDictionary is an internal sealed class,
+        # so one can't use PowerShell's '-is' operator to validate type.
+        if ($_.GetType().Name -ne 'PSBoundParametersDictionary') {
+          Throw 'BoundParameters must be a System.Management.Automation.PSBoundParametersDictionary object'
+        }
+        $true
+      })]
+    $BoundParameters
   )
 
   Begin {
-      Write-Verbose 'Creating new dynamic parameters dictionary'
-      $InternalDictionary = New-Object -TypeName System.Management.Automation.RuntimeDefinedParameterDictionary
+    Write-Verbose 'Creating new dynamic parameters dictionary'
+    $InternalDictionary = New-Object -TypeName System.Management.Automation.RuntimeDefinedParameterDictionary
 
-      Write-Verbose 'Getting common parameters'
-      function _temp { [CmdletBinding()] Param() }
-      $CommonParameters = (Get-Command _temp).Parameters.Keys
+    Write-Verbose 'Getting common parameters'
+    function _temp { [CmdletBinding()] Param() }
+    $CommonParameters = (Get-Command _temp).Parameters.Keys
   }
 
   Process {
-      if ($CreateVariables) {
-          Write-Verbose 'Creating variables from bound parameters'
-          Write-Debug 'Picking out bound parameters that are not in common parameters set'
-          $BoundKeys = $BoundParameters.Keys | Where-Object { $CommonParameters -notcontains $_ }
+    if ($CreateVariables) {
+      Write-Verbose 'Creating variables from bound parameters'
+      Write-Debug 'Picking out bound parameters that are not in common parameters set'
+      $BoundKeys = $BoundParameters.Keys | Where-Object { $CommonParameters -notcontains $_ }
 
-          foreach ($Parameter in $BoundKeys) {
-              Write-Debug "Setting existing variable for dynamic parameter '$Parameter' with value '$($BoundParameters.$Parameter)'"
-              Set-Variable -Name $Parameter -Value $BoundParameters.$Parameter -Scope 1 -Force
+      foreach ($Parameter in $BoundKeys) {
+        Write-Debug "Setting existing variable for dynamic parameter '$Parameter' with value '$($BoundParameters.$Parameter)'"
+        Set-Variable -Name $Parameter -Value $BoundParameters.$Parameter -Scope 1 -Force
+      }
+    }
+    else {
+      Write-Verbose 'Looking for cached bound parameters'
+      Write-Debug 'More info: https://beatcracker.wordpress.com/2014/12/18/psboundparameters-pipeline-and-the-valuefrompipelinebypropertyname-parameter-attribute'
+      $StaleKeys = @()
+      $StaleKeys = $PSBoundParameters.GetEnumerator() |
+      ForEach-Object {
+        if ($_.Value.PSobject.Methods.Name -match '^Equals$') {
+          # If object has Equals, compare bound key and variable using it
+          if (!$_.Value.Equals((Get-Variable -Name $_.Key -ValueOnly -Scope 0))) {
+            $_.Key
           }
+        }
+        else {
+          # If object doesn't has Equals (e.g. $null), fallback to the PowerShell's -ne operator
+          if ($_.Value -ne (Get-Variable -Name $_.Key -ValueOnly -Scope 0)) {
+            $_.Key
+          }
+        }
+      }
+      if ($StaleKeys) {
+        [string[]]"Found $($StaleKeys.Count) cached bound parameters:" + $StaleKeys | Write-Debug
+        Write-Verbose 'Removing cached bound parameters'
+        $StaleKeys | ForEach-Object { [void]$PSBoundParameters.Remove($_) }
+      }
+
+      # Since we rely solely on $PSBoundParameters, we don't have access to default values for unbound parameters
+      Write-Verbose 'Looking for unbound parameters with default values'
+
+      Write-Debug 'Getting unbound parameters list'
+      $UnboundParameters = (Get-Command -Name ($PSCmdlet.MyInvocation.InvocationName)).Parameters.GetEnumerator() |
+      # Find parameters that are belong to the current parameter set
+      Where-Object { $_.Value.ParameterSets.Keys -contains $PsCmdlet.ParameterSetName } |
+      Select-Object -ExpandProperty Key |
+      # Find unbound parameters in the current parameter set
+      Where-Object { $PSBoundParameters.Keys -notcontains $_ }
+
+      # Even if parameter is not bound, corresponding variable is created with parameter's default value (if specified)
+      Write-Debug 'Trying to get variables with default parameter value and create a new bound parameter''s'
+      $tmp = $null
+      foreach ($Parameter in $UnboundParameters) {
+        $DefaultValue = Get-Variable -Name $Parameter -ValueOnly -Scope 0
+        if (!$PSBoundParameters.TryGetValue($Parameter, [ref]$tmp) -and $DefaultValue) {
+          $PSBoundParameters.$Parameter = $DefaultValue
+          Write-Debug "Added new parameter '$Parameter' with value '$DefaultValue'"
+        }
+      }
+
+      if ($Dictionary) {
+        Write-Verbose 'Using external dynamic parameter dictionary'
+        $DPDictionary = $Dictionary
       }
       else {
-          Write-Verbose 'Looking for cached bound parameters'
-          Write-Debug 'More info: https://beatcracker.wordpress.com/2014/12/18/psboundparameters-pipeline-and-the-valuefrompipelinebypropertyname-parameter-attribute'
-          $StaleKeys = @()
-          $StaleKeys = $PSBoundParameters.GetEnumerator() |
-              ForEach-Object {
-              if ($_.Value.PSobject.Methods.Name -match '^Equals$') {
-                  # If object has Equals, compare bound key and variable using it
-                  if (!$_.Value.Equals((Get-Variable -Name $_.Key -ValueOnly -Scope 0))) {
-                      $_.Key
-                  }
-              }
-              else {
-                  # If object doesn't has Equals (e.g. $null), fallback to the PowerShell's -ne operator
-                  if ($_.Value -ne (Get-Variable -Name $_.Key -ValueOnly -Scope 0)) {
-                      $_.Key
-                  }
-              }
-          }
-          if ($StaleKeys) {
-              [string[]]"Found $($StaleKeys.Count) cached bound parameters:" + $StaleKeys | Write-Debug
-              Write-Verbose 'Removing cached bound parameters'
-              $StaleKeys | ForEach-Object {[void]$PSBoundParameters.Remove($_)}
-          }
-
-          # Since we rely solely on $PSBoundParameters, we don't have access to default values for unbound parameters
-          Write-Verbose 'Looking for unbound parameters with default values'
-
-          Write-Debug 'Getting unbound parameters list'
-          $UnboundParameters = (Get-Command -Name ($PSCmdlet.MyInvocation.InvocationName)).Parameters.GetEnumerator()  |
-              # Find parameters that are belong to the current parameter set
-          Where-Object { $_.Value.ParameterSets.Keys -contains $PsCmdlet.ParameterSetName } |
-              Select-Object -ExpandProperty Key |
-              # Find unbound parameters in the current parameter set
-                                              Where-Object { $PSBoundParameters.Keys -notcontains $_ }
-
-          # Even if parameter is not bound, corresponding variable is created with parameter's default value (if specified)
-          Write-Debug 'Trying to get variables with default parameter value and create a new bound parameter''s'
-          $tmp = $null
-          foreach ($Parameter in $UnboundParameters) {
-              $DefaultValue = Get-Variable -Name $Parameter -ValueOnly -Scope 0
-              if (!$PSBoundParameters.TryGetValue($Parameter, [ref]$tmp) -and $DefaultValue) {
-                  $PSBoundParameters.$Parameter = $DefaultValue
-                  Write-Debug "Added new parameter '$Parameter' with value '$DefaultValue'"
-              }
-          }
-
-          if ($Dictionary) {
-              Write-Verbose 'Using external dynamic parameter dictionary'
-              $DPDictionary = $Dictionary
-          }
-          else {
-              Write-Verbose 'Using internal dynamic parameter dictionary'
-              $DPDictionary = $InternalDictionary
-          }
-
-          Write-Verbose "Creating new dynamic parameter: $Name"
-
-          # Shortcut for getting local variables
-          $GetVar = {Get-Variable -Name $_ -ValueOnly -Scope 0}
-
-          # Strings to match attributes and validation arguments
-          $AttributeRegex = '^(Mandatory|Position|ParameterSetName|DontShow|HelpMessage|ValueFromPipeline|ValueFromPipelineByPropertyName|ValueFromRemainingArguments)$'
-          $ValidationRegex = '^(AllowNull|AllowEmptyString|AllowEmptyCollection|ValidateCount|ValidateLength|ValidatePattern|ValidateRange|ValidateScript|ValidateSet|ValidateNotNull|ValidateNotNullOrEmpty)$'
-          $AliasRegex = '^Alias$'
-
-          Write-Debug 'Creating new parameter''s attirubutes object'
-          $ParameterAttribute = New-Object -TypeName System.Management.Automation.ParameterAttribute
-
-          Write-Debug 'Looping through the bound parameters, setting attirubutes...'
-          switch -regex ($PSBoundParameters.Keys) {
-              $AttributeRegex {
-                  Try {
-                      $ParameterAttribute.$_ = . $GetVar
-                      Write-Debug "Added new parameter attribute: $_"
-                  }
-                  Catch {
-                      $_
-                  }
-                  continue
-              }
-          }
-
-          if ($DPDictionary.Keys -contains $Name) {
-              Write-Verbose "Dynamic parameter '$Name' already exist, adding another parameter set to it"
-              $DPDictionary.$Name.Attributes.Add($ParameterAttribute)
-          }
-          else {
-              Write-Verbose "Dynamic parameter '$Name' doesn't exist, creating"
-
-              Write-Debug 'Creating new attribute collection object'
-              $AttributeCollection = New-Object -TypeName Collections.ObjectModel.Collection[System.Attribute]
-
-              Write-Debug 'Looping through bound parameters, adding attributes'
-              switch -regex ($PSBoundParameters.Keys) {
-                  $ValidationRegex {
-                      Try {
-                          $ParameterOptions = New-Object -TypeName "System.Management.Automation.${_}Attribute" -ArgumentList (. $GetVar) -ErrorAction Stop
-                          $AttributeCollection.Add($ParameterOptions)
-                          Write-Debug "Added attribute: $_"
-                      }
-                      Catch {
-                          $_
-                      }
-                      continue
-                  }
-
-                  $AliasRegex {
-                      Try {
-                          $ParameterAlias = New-Object -TypeName System.Management.Automation.AliasAttribute -ArgumentList (. $GetVar) -ErrorAction Stop
-                          $AttributeCollection.Add($ParameterAlias)
-                          Write-Debug "Added alias: $_"
-                          continue
-                      }
-                      Catch {
-                          $_
-                      }
-                  }
-              }
-
-              Write-Debug 'Adding attributes to the attribute collection'
-              $AttributeCollection.Add($ParameterAttribute)
-
-              Write-Debug 'Finishing creation of the new dynamic parameter'
-              $Parameter = New-Object -TypeName System.Management.Automation.RuntimeDefinedParameter -ArgumentList @($Name, $Type, $AttributeCollection)
-
-              Write-Debug 'Adding dynamic parameter to the dynamic parameter dictionary'
-              $DPDictionary.Add($Name, $Parameter)
-          }
+        Write-Verbose 'Using internal dynamic parameter dictionary'
+        $DPDictionary = $InternalDictionary
       }
+
+      Write-Verbose "Creating new dynamic parameter: $Name"
+
+      # Shortcut for getting local variables
+      $GetVar = { Get-Variable -Name $_ -ValueOnly -Scope 0 }
+
+      # Strings to match attributes and validation arguments
+      $AttributeRegex = '^(Mandatory|Position|ParameterSetName|DontShow|HelpMessage|ValueFromPipeline|ValueFromPipelineByPropertyName|ValueFromRemainingArguments)$'
+      $ValidationRegex = '^(AllowNull|AllowEmptyString|AllowEmptyCollection|ValidateCount|ValidateLength|ValidatePattern|ValidateRange|ValidateScript|ValidateSet|ValidateNotNull|ValidateNotNullOrEmpty)$'
+      $AliasRegex = '^Alias$'
+
+      Write-Debug 'Creating new parameter''s attirubutes object'
+      $ParameterAttribute = New-Object -TypeName System.Management.Automation.ParameterAttribute
+
+      Write-Debug 'Looping through the bound parameters, setting attirubutes...'
+      switch -regex ($PSBoundParameters.Keys) {
+        $AttributeRegex {
+          Try {
+            $ParameterAttribute.$_ = . $GetVar
+            Write-Debug "Added new parameter attribute: $_"
+          }
+          Catch {
+            $_
+          }
+          continue
+        }
+      }
+
+      if ($DPDictionary.Keys -contains $Name) {
+        Write-Verbose "Dynamic parameter '$Name' already exist, adding another parameter set to it"
+        $DPDictionary.$Name.Attributes.Add($ParameterAttribute)
+      }
+      else {
+        Write-Verbose "Dynamic parameter '$Name' doesn't exist, creating"
+
+        Write-Debug 'Creating new attribute collection object'
+        $AttributeCollection = New-Object -TypeName Collections.ObjectModel.Collection[System.Attribute]
+
+        Write-Debug 'Looping through bound parameters, adding attributes'
+        switch -regex ($PSBoundParameters.Keys) {
+          $ValidationRegex {
+            Try {
+              $ParameterOptions = New-Object -TypeName "System.Management.Automation.${_}Attribute" -ArgumentList (. $GetVar) -ErrorAction Stop
+              $AttributeCollection.Add($ParameterOptions)
+              Write-Debug "Added attribute: $_"
+            }
+            Catch {
+              $_
+            }
+            continue
+          }
+
+          $AliasRegex {
+            Try {
+              $ParameterAlias = New-Object -TypeName System.Management.Automation.AliasAttribute -ArgumentList (. $GetVar) -ErrorAction Stop
+              $AttributeCollection.Add($ParameterAlias)
+              Write-Debug "Added alias: $_"
+              continue
+            }
+            Catch {
+              $_
+            }
+          }
+        }
+
+        Write-Debug 'Adding attributes to the attribute collection'
+        $AttributeCollection.Add($ParameterAttribute)
+
+        Write-Debug 'Finishing creation of the new dynamic parameter'
+        $Parameter = New-Object -TypeName System.Management.Automation.RuntimeDefinedParameter -ArgumentList @($Name, $Type, $AttributeCollection)
+
+        Write-Debug 'Adding dynamic parameter to the dynamic parameter dictionary'
+        $DPDictionary.Add($Name, $Parameter)
+      }
+    }
   }
 
   End {
-      if (!$CreateVariables -and !$Dictionary) {
-          Write-Verbose 'Writing dynamic parameter dictionary to the pipeline'
-          $DPDictionary
-      }
+    if (!$CreateVariables -and !$Dictionary) {
+      Write-Verbose 'Writing dynamic parameter dictionary to the pipeline'
+      $DPDictionary
+    }
   }
 }
 # Call Init function
