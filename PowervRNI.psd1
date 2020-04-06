@@ -8,144 +8,144 @@
 
 @{
 
-    # Script module or binary module file associated with this manifest.
-    RootModule             = 'PowervRNI.psm1'
+  # Script module or binary module file associated with this manifest.
+  RootModule             = 'PowervRNI.psm1'
 
-    # Version number of this module.
-    ModuleVersion          = '1.7.119'
+  # Version number of this module.
+  ModuleVersion          = '1.7.119'
 
-    # Supported PSEditions
-    # CompatiblePSEditions = @()
+  # Supported PSEditions
+  # CompatiblePSEditions = @()
 
-    # ID used to uniquely identify this module
-    GUID                   = 'a34be6be-3dc1-457a-aea3-d4263481ed79'
+  # ID used to uniquely identify this module
+  GUID                   = 'a34be6be-3dc1-457a-aea3-d4263481ed79'
 
-    # Author of this module
-    Author                 = 'Martijn Smit'
+  # Author of this module
+  Author                 = 'Martijn Smit'
 
-    # Company or vendor of this module
-    CompanyName            = 'VMware'
+  # Company or vendor of this module
+  CompanyName            = 'VMware'
 
-    # Copyright statement for this module
-    Copyright              = 'Copyright 2019 VMware. All rights reserved.'
+  # Copyright statement for this module
+  Copyright              = 'Copyright 2019 VMware. All rights reserved.'
 
-    # Description of the functionality provided by this module
-    Description            = 'A PowerShell module to talk to the vRealize Network Insight API'
+  # Description of the functionality provided by this module
+  Description            = 'A PowerShell module to talk to the vRealize Network Insight API'
 
-    # Minimum version of the Windows PowerShell engine required by this module
-    PowerShellVersion      = '3.0'
+  # Minimum version of the Windows PowerShell engine required by this module
+  PowerShellVersion      = '3.0'
 
-    # Name of the Windows PowerShell host required by this module
-    # PowerShellHostName = ''
+  # Name of the Windows PowerShell host required by this module
+  # PowerShellHostName = ''
 
-    # Minimum version of the Windows PowerShell host required by this module
-    # PowerShellHostVersion = ''
+  # Minimum version of the Windows PowerShell host required by this module
+  # PowerShellHostVersion = ''
 
-    # Minimum version of Microsoft .NET Framework required by this module. This prerequisite is valid for the PowerShell Desktop edition only.
-    DotNetFrameworkVersion = '4.0'
+  # Minimum version of Microsoft .NET Framework required by this module. This prerequisite is valid for the PowerShell Desktop edition only.
+  DotNetFrameworkVersion = '4.0'
 
-    # Minimum version of the common language runtime (CLR) required by this module. This prerequisite is valid for the PowerShell Desktop edition only.
-    # CLRVersion = ''
+  # Minimum version of the common language runtime (CLR) required by this module. This prerequisite is valid for the PowerShell Desktop edition only.
+  # CLRVersion = ''
 
-    # Processor architecture (None, X86, Amd64) required by this module
-    # ProcessorArchitecture = ''
+  # Processor architecture (None, X86, Amd64) required by this module
+  # ProcessorArchitecture = ''
 
-    # Modules that must be imported into the global environment prior to importing this module
-    # RequiredModules = @()
+  # Modules that must be imported into the global environment prior to importing this module
+  # RequiredModules = @()
 
-    # Assemblies that must be loaded prior to importing this module
-    # RequiredAssemblies = @()
+  # Assemblies that must be loaded prior to importing this module
+  # RequiredAssemblies = @()
 
-    # Script files (.ps1) that are run in the caller's environment prior to importing this module.
-    # ScriptsToProcess = @()
+  # Script files (.ps1) that are run in the caller's environment prior to importing this module.
+  # ScriptsToProcess = @()
 
-    # Type files (.ps1xml) to be loaded when importing this module
-    # TypesToProcess = @()
+  # Type files (.ps1xml) to be loaded when importing this module
+  # TypesToProcess = @()
 
-    # Format files (.ps1xml) to be loaded when importing this module
-    # FormatsToProcess = @()
+  # Format files (.ps1xml) to be loaded when importing this module
+  # FormatsToProcess = @()
 
-    # Modules to import as nested modules of the module specified in RootModule/ModuleToProcess
-    # NestedModules = @()
+  # Modules to import as nested modules of the module specified in RootModule/ModuleToProcess
+  # NestedModules = @()
 
-    # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-    FunctionsToExport      = 'Connect-vRNIServer', 'Connect-NIServer', 'Disable-vRNIDataSource',
-    'Disconnect-vRNIServer', 'Enable-vRNIDataSource',
-    'Get-vRNIAPIVersion', 'Get-vRNIApplication',
-    'Get-vRNIApplicationTier', 'Get-vRNIDataSource', 'Get-vRNIDatastore',
-    'Get-vRNIDistributedSwitch', 'Get-vRNIDistributedSwitchPortGroup',
-    'Get-vRNIEntity', 'Get-vRNIEntityName', 'Get-vRNIFirewallRule',
-    'Get-vRNIFlow', 'Get-vRNIHost', 'Get-vRNIHostVMKNic', 'Get-vRNIIPSet',
-    'Get-vRNIL2Network', 'Get-vRNINodes', 'Get-vRNINSXManager',
-    'Get-vRNIProblem', 'Get-vRNIRecommendedRules',
-    'Get-vRNIRecommendedRulesNsxBundle', 'Get-vRNISecurityGroup',
-    'Get-vRNISecurityTag', 'Get-vRNIService', 'Get-vRNIServiceGroup',
-    'Get-vRNIvCenter', 'Get-vRNIvCenterCluster',
-    'Get-vRNIvCenterDatacenter', 'Get-vRNIvCenterFolder', 'Get-vRNIVM',
-    'Get-vRNIVMvNIC', 'Get-vRNIDataSourceSNMPConfig',
-    'Invoke-vRNIRestMethod', 'New-vRNIApplication',
-    'New-vRNIApplicationTier', 'New-vRNIDataSource',
-    'Remove-vRNIApplication', 'Remove-vRNIApplicationTier',
-    'Remove-vRNIDataSource', 'Set-vRNIDataSourceSNMPConfig',
-    'New-vRNISubnetMapping', 'Get-vRNISubnetMapping',
-    'Get-vRNIEastWestIP', 'Add-vRNIEastWestIP', 'Remove-vRNIEastWestIP',
-    'Get-vRNINorthSouthIP', 'Add-vRNINorthSouthIP',
-    'Remove-vRNINorthSouthIP', 'Get-vRNISettingsVIDM',
-    'Set-vRNISettingsVIDM', 'Get-vRNISettingsUserGroup',
-    'Set-vRNISettingsUserGroup', 'Remove-vRNISettingsUserGroup',
-    'Get-vRNISettingsUser', 'Set-vRNISettingsUser',
-    'Remove-vRNISettingsUser', 'Get-vRNIAuditLogs',
-    'Get-vRNIApplicationMemberVM', 'Set-vRNIUserPassword',
-    'Get-vRNIKubernetesServices', 'Update-vRNIDataSourceData',
-    'Update-vRNINSXvControllerClusterPassword', 'Get-vRNIEntityNames'
+  # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
+  FunctionsToExport      = 'Connect-vRNIServer', 'Connect-NIServer', 'Disable-vRNIDataSource',
+  'Disconnect-vRNIServer', 'Enable-vRNIDataSource',
+  'Get-vRNIAPIVersion', 'Get-vRNIApplication',
+  'Get-vRNIApplicationTier', 'Get-vRNIDataSource', 'Get-vRNIDatastore',
+  'Get-vRNIDistributedSwitch', 'Get-vRNIDistributedSwitchPortGroup',
+  'Get-vRNIEntity', 'Get-vRNIEntityName', 'Get-vRNIFirewallRule',
+  'Get-vRNIFlow', 'Get-vRNIHost', 'Get-vRNIHostVMKNic', 'Get-vRNIIPSet',
+  'Get-vRNIL2Network', 'Get-vRNINodes', 'Get-vRNINSXManager',
+  'Get-vRNIProblem', 'Get-vRNIRecommendedRules',
+  'Get-vRNIRecommendedRulesNsxBundle', 'Get-vRNISecurityGroup',
+  'Get-vRNISecurityTag', 'Get-vRNIService', 'Get-vRNIServiceGroup',
+  'Get-vRNIvCenter', 'Get-vRNIvCenterCluster',
+  'Get-vRNIvCenterDatacenter', 'Get-vRNIvCenterFolder', 'Get-vRNIVM',
+  'Get-vRNIVMvNIC', 'Get-vRNIDataSourceSNMPConfig',
+  'Invoke-vRNIRestMethod', 'New-vRNIApplication',
+  'New-vRNIApplicationTier', 'New-vRNIDataSource',
+  'Remove-vRNIApplication', 'Remove-vRNIApplicationTier',
+  'Remove-vRNIDataSource', 'Set-vRNIDataSourceSNMPConfig',
+  'New-vRNISubnetMapping', 'Get-vRNISubnetMapping',
+  'Get-vRNIEastWestIP', 'Add-vRNIEastWestIP', 'Remove-vRNIEastWestIP',
+  'Get-vRNINorthSouthIP', 'Add-vRNINorthSouthIP',
+  'Remove-vRNINorthSouthIP', 'Get-vRNISettingsVIDM',
+  'Set-vRNISettingsVIDM', 'Get-vRNISettingsUserGroup',
+  'Set-vRNISettingsUserGroup', 'Remove-vRNISettingsUserGroup',
+  'Get-vRNISettingsUser', 'Set-vRNISettingsUser',
+  'Remove-vRNISettingsUser', 'Get-vRNIAuditLogs',
+  'Get-vRNIApplicationMemberVM', 'Set-vRNIUserPassword',
+  'Get-vRNIKubernetesServices', 'Update-vRNIDataSourceData',
+  'Update-vRNINSXvControllerClusterPassword', 'Get-vRNIEntityNames'
 
-    # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
-    CmdletsToExport        = '*'
+  # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
+  CmdletsToExport        = '*'
 
-    # Variables to export from this module
-    VariablesToExport      = '*'
+  # Variables to export from this module
+  VariablesToExport      = '*'
 
-    # Aliases to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no aliases to export.
-    AliasesToExport        = '*'
+  # Aliases to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no aliases to export.
+  AliasesToExport        = '*'
 
-    # DSC resources to export from this module
-    # DscResourcesToExport = @()
+  # DSC resources to export from this module
+  # DscResourcesToExport = @()
 
-    # List of all modules packaged with this module
-    # ModuleList = @()
+  # List of all modules packaged with this module
+  # ModuleList = @()
 
-    # List of all files packaged with this module
-    # FileList = @()
+  # List of all files packaged with this module
+  # FileList = @()
 
-    # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
-    PrivateData            = @{
+  # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
+  PrivateData            = @{
 
-        PSData = @{
+    PSData = @{
 
-            # Tags applied to this module. These help with module discovery in online galleries.
-            # Tags = @()
+      # Tags applied to this module. These help with module discovery in online galleries.
+      # Tags = @()
 
-            # A URL to the license for this module.
-            LicenseUri = 'https://github.com/PowervRNI/powervrni/blob/master/LICENSE.md'
+      # A URL to the license for this module.
+      LicenseUri = 'https://github.com/PowervRNI/powervrni/blob/master/LICENSE.md'
 
-            # A URL to the main website for this project.
-            ProjectUri = 'https://github.com/PowervRNI/powervrni'
+      # A URL to the main website for this project.
+      ProjectUri = 'https://github.com/PowervRNI/powervrni'
 
-            # A URL to an icon representing this module.
-            # IconUri = ''
+      # A URL to an icon representing this module.
+      # IconUri = ''
 
-            # ReleaseNotes of this module
-            # ReleaseNotes = ''
+      # ReleaseNotes of this module
+      # ReleaseNotes = ''
 
-        } # End of PSData hashtable
+    } # End of PSData hashtable
 
-    } # End of PrivateData hashtable
+  } # End of PrivateData hashtable
 
-    # HelpInfo URI of this module
-    # HelpInfoURI = ''
+  # HelpInfo URI of this module
+  # HelpInfoURI = ''
 
-    # Default prefix for commands exported from this module. Override the default prefix using Import-Module -Prefix.
-    # DefaultCommandPrefix = ''
+  # Default prefix for commands exported from this module. Override the default prefix using Import-Module -Prefix.
+  # DefaultCommandPrefix = ''
 
 }
 
