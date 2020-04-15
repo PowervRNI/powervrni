@@ -1,7 +1,7 @@
 # VMware vRealize Network Insight PowerShell module
 # Martijn Smit (@smitmartijn)
 # msmit@vmware.com
-# Version 1.7
+# Version 1.8
 
 
 # Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource
@@ -12,6 +12,7 @@ $Script:DatasourceURLs.Add("nsxt", @("/data-sources/nsxt-managers"))
 $Script:DatasourceURLs.Add("ciscoswitch", @("/data-sources/cisco-switches"))
 $Script:DatasourceURLs.Add("aristaswitch", @("/data-sources/arista-switches"))
 $Script:DatasourceURLs.Add("dellswitch", @("/data-sources/dell-switches"))
+$Script:DatasourceURLs.Add("dellos10switch", @("/data-sources/dell-os10-switches"))
 $Script:DatasourceURLs.Add("brocadeswitch", @("/data-sources/brocade-switches"))
 $Script:DatasourceURLs.Add("juniperswitch", @("/data-sources/juniper-switches"))
 $Script:DatasourceURLs.Add("ciscoucs", @("/data-sources/ucs-managers"))
@@ -752,7 +753,7 @@ function Get-vRNIDataSource
   Process
   {
     # Bind the parameter to a friendly variable
-    if($null -ne $PSBoundParameters.Keys) {
+    if($PSBoundParameters.ContainsKey("DataSourceType")) {
       New-DynamicParameter -CreateVariables -BoundParameters $PSBoundParameters
     }
 
@@ -1021,6 +1022,12 @@ function New-vRNIDataSource
       "nickname" = $Nickname
       "notes" = $Notes
       "enabled" = $Enabled
+    }
+
+    # ServiceNow uses instance_id as the FQDN
+    if($DataSourceType -eq "servicenow") {
+      $requestFormat.instance_id = $FDQN
+      $requestFormat.is_graph_config_customized = "false" # TODO: support customised relation graphs
     }
 
     # For any other data source than a generic (UANI) switch, K8s or OpenShift, use regular credentials
@@ -2211,11 +2218,11 @@ function Get-vRNIEntity
 
       foreach($entity in $entity_info.results)
       {
-        $entity = $entity.entity
         # If we're retrieving flows, add the time of the main flow to this specific flow record
         if($Entity_URI -eq "flows") {
-          $entity | Add-Member -Name "time" -value $entity.time -MemberType NoteProperty
+          $entity.entity | Add-Member -Name "time" -value $entity.time -MemberType NoteProperty
         }
+        $entity = $entity.entity
 
         $entities.Add($entity) | Out-Null
         $current_count++
@@ -2244,7 +2251,7 @@ function Get-vRNIEntity
 
       # If we're retrieving flows, add the time of the main flow to this specific flow record
       if($Entity_URI -eq "flows") {
-        $entity_info | Add-Member -Name "time" -value $entity_info.time -MemberType NoteProperty
+        $entity_info | Add-Member -Name "time" -value $sg.time -MemberType NoteProperty
       }
 
       $entities.Add($entity_info) | Out-Null
@@ -2302,6 +2309,54 @@ function Get-vRNIEntityName
   # Call Invoke-vRNIRestMethod with the proper URI to get the entity results
   $result = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/entities/names/$($EntityID)"
   $result
+}
+
+function Get-vRNIEntityNames
+{
+  <#
+  .SYNOPSIS
+  Translate an array of entity ids to names in vRealize Network Insight.
+
+  .DESCRIPTION
+  The internal database of vRealize Network Insight uses entity IDs
+  to keep track of entities. This function translates an ID to an
+  actual useable name.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIEntityNames -EntityID 14307:562:1274720802,14307:562:1274720803 -EntityType VirtualMachine
+  Get the name of the entity with ID 14307:562:1274720802 and 14307:562:1274720803
+  #>
+  param (
+    [Parameter (Mandatory=$true, Position=1)]
+      # The entity IDs to resolve to a name
+      [string[]]$EntityIDs,
+    [Parameter (Mandatory=$true, Position=2)]
+      # The entity type to resolve to a name
+      [string[]]$EntityType,
+    [Parameter (Mandatory=$False)]
+      # vRNI Connection object
+      [ValidateNotNullOrEmpty()]
+      [PSCustomObject]$Connection=$defaultvRNIConnection
+  )
+
+  $requestFormat = @{
+    "entity_ids" = @()
+  }
+
+  foreach($entityID in $EntityIDs)
+  {
+    $record = @{
+      "entity_id" = $entityID
+      "entity_type" = $EntityType
+    }
+
+    $requestFormat.entity_ids += $record
+  }
+
+  $requestBody = ConvertTo-Json $requestFormat
+  $entity_info = Invoke-vRNIRestMethod -Connection $Connection -Method POST -URI "/api/ni/entities/fetch" -Body $requestBody
+
+  $entity_info.results
 }
 
 function Get-vRNIProblem
