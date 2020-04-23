@@ -369,22 +369,26 @@ function Connect-vRNIServer {
   if successful.
 
   .EXAMPLE
-  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password secret
+  PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password $mysecpassword
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
   with the given local credentials. Returns the connection object, if successful.
 
   .EXAMPLE
-  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password secret
+  PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password $mysecpassword
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
   with the given LDAP credentials. Returns the connection object, if successful.
 
   .EXAMPLE
-  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password secret -UseLocalAuth
+  PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password $mysecpassword -UseLocalAuth
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
   with the given LOCAL credentials. Returns the connection object, if successful.
 
   .EXAMPLE
-  PS C:\> $MyConnection = Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password secret
+  PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
+  PS C:\> $MyConnection = Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password $mysecpassword
   PS C:\> Get-vRNIDataSource -Connection $MyConnection
   Connects to vRNI with the given credentials and then uses the returned
   connection object in the next cmdlet to retrieve all datasources from
@@ -824,15 +828,17 @@ function New-vRNIDataSource {
   correlate and display this data in the interfce.
 
   .EXAMPLE
+  PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
-  PS C:\> New-vRNIDataSource -DataSourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password secret -CollectorVMId $collectorId -Nickname vc.nsx.local
+  PS C:\> New-vRNIDataSource -DataSourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password $mysecpassword -CollectorVMId $collectorId -Nickname vc.nsx.local
 
   First, get the node ID of the collector VM (assuming there's only one), then add a vCenter located at vc.nsx.local to vRNI.
 
   .EXAMPLE
+  PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
   PS C:\> $vcId = (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id)
-  PS C:\> New-vRNIDataSource -DataSourceType nsxv -FDQN mgr.nsx.local -Username admin -Password secret -Nickname mgr.nsx.local -CollectorVMId $collectorId -Enabled $True -NSXEnableCentralCLI $True -NSXEnableIPFIX $True -NSXvCenterID $vcId
+  PS C:\> New-vRNIDataSource -DataSourceType nsxv -FDQN mgr.nsx.local -Username admin -Password $mysecpassword -Nickname mgr.nsx.local -CollectorVMId $collectorId -Enabled $True -NSXEnableCentralCLI $True -NSXEnableIPFIX $True -NSXvCenterID $vcId
 
   Adds a new NSX Manager as a data source, auto select the collector ID (if you only have one), enable the NSX Central CLI for collecting data, also enable NSX IPFIX for network datastream insight from the point of view of NSX.
 
@@ -1170,7 +1176,8 @@ function Update-vRNIDataSource {
   This cmdlet updates a datasources in vRNI.
 
   .EXAMPLE
-  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Update-vRNIDataSource -Username admin -Password 'VMware1!'
+  PS C:\> $mysecpassword = ConvertTo-SecureString VMware1! -AsPlainText -Force
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Update-vRNIDataSource -Username admin -Password $mysecpassword
   Updates the credentials of a vCenter datasource with the nickname "vc.nsx.local"
 
   .EXAMPLE
@@ -1525,7 +1532,9 @@ function Set-vRNIDataSourceSNMPConfig {
   the SNMP configuration of a specific data source.
 
   .EXAMPLE
-  PS C:\> $snmpOptions = @{ "Enabled" = $true; "Username" = "snmpv3user"; "ContextName" = " "; "AuthenticationType" = "MD5";  "AuthenticationPassword" = "ult1m4t3p4ss";  "PrivacyType" = "AES128";  "PrivacyPassword" = "s0pr1v4t3"; }
+  PS C:\> $AuthenticationPassword = ConvertTo-SecureString ult1m4t3p4ss -AsPlainText -Force
+  PS C:\> $PrivacyPassword = ConvertTo-SecureString s0pr1v4t3 -AsPlainText -Force
+  PS C:\> $snmpOptions = @{ "Enabled" = $true; "Username" = "snmpv3user"; "ContextName" = " "; "AuthenticationType" = "MD5";  "AuthenticationPassword" = $AuthenticationPassword;  "PrivacyType" = "AES128";  "PrivacyPassword" = $PrivacyPassword; }
   PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "Core01"} | Set-vRNIDataSourceSNMPConfig @snmpOptions
   Configures SNMPv3 for a data source named 'Core01'
 
@@ -4128,7 +4137,8 @@ function Set-vRNIUserPassword {
   allow member to set their own passwords.
 
   .EXAMPLE
-  PS C:\> Set-vRNIUserPassword -Username admin@local -NewPassword 'mynewpassword'
+  PS C:\> $mynewpassword = ConvertTo-SecureString mynewpassword -AsPlainText -Force
+  PS C:\> Set-vRNIUserPassword -Username admin@local -NewPassword $mynewpassword
 
   .EXAMPLE
   PS C:\> Set-vRNIUserPassword -Username admin@local
