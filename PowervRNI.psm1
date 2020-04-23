@@ -402,7 +402,7 @@ function Connect-vRNIServer {
     [Parameter (Mandatory = $false)]
     # Password to use to login to vRNI
     [ValidateNotNullOrEmpty()]
-    [string]$Password,
+    [securestring]$Password,
     [Parameter (Mandatory = $false)]
     #PSCredential object containing NSX API authentication credentials
     [PSCredential]$Credential,
@@ -431,7 +431,7 @@ function Connect-vRNIServer {
     }
     # If the password has been given in cleartext,
     else {
-      $connection_credentials = New-Object System.Management.Automation.PSCredential($Username, $(ConvertTo-SecureString $Password -AsPlainText -Force))
+      $connection_credentials = New-Object System.Management.Automation.PSCredential($Username, $Password)
     }
   }
   # If a credential object was given as a parameter, use that
@@ -862,7 +862,7 @@ function New-vRNIDataSource {
     [Parameter (Mandatory = $false)]
     # Password to use to login to the datasource
     [ValidateNotNullOrEmpty()]
-    [string]$Password = "",
+    [securestring]$Password = "",
 
     [Parameter (Mandatory = $false)]
     # The IP address of the datasource
@@ -1048,9 +1048,10 @@ function New-vRNIDataSource {
 
     # For any other data source than a generic (UANI) switch, K8s or OpenShift, use regular credentials
     if ($DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") {
+      $cred = New-Object System.Management.Automation.PSCredential("", $Password)
       $requestFormat.credentials = @{
         "username" = $Username
-        "password" = $Password
+        "password" = $cred.GetNetworkCredential().Password
       }
     }
     else {
@@ -1196,7 +1197,7 @@ function Update-vRNIDataSource {
     [Parameter (Mandatory = $false)]
     # Password to use to login to the datasource
     [ValidateNotNullOrEmpty()]
-    [string]$Password = "",
+    [securestring]$Password = "",
 
     [Parameter (Mandatory = $false)]
     # Optional notes for the datasource
@@ -1228,7 +1229,8 @@ function Update-vRNIDataSource {
 
       }
       if ($Password -ne "") {
-        $oThisDatasource.credentials.password = $Password
+        $cred = New-Object System.Management.Automation.PSCredential("", $Password)
+        $oThisDatasource.credentials.password = $cred.GetNetworkCredential().Password
       }
       if ($Notes -ne "") {
         if ($null -eq $oThisDatasource.notes) {
@@ -1568,7 +1570,7 @@ function Set-vRNIDataSourceSNMPConfig {
     [Parameter (Mandatory = $true, ParameterSetName = "SNMPv3")]
     # SNMP v3 Authentication Password
     [ValidateNotNullOrEmpty()]
-    [string]$AuthenticationPassword,
+    [securestring]$AuthenticationPassword,
     [Parameter (Mandatory = $true, ParameterSetName = "SNMPv3")]
     # SNMP v3 Privacy Type
     [ValidateSet ("AES", "DES", "AES128", "AES192", "AES256", "3DES", "NO_PRIV")]
@@ -1576,7 +1578,7 @@ function Set-vRNIDataSourceSNMPConfig {
     [Parameter (Mandatory = $true, ParameterSetName = "SNMPv3")]
     # SNMP v3 Privacy Password
     [ValidateNotNullOrEmpty()]
-    [string]$PrivacyPassword,
+    [securestring]$PrivacyPassword,
 
     [Parameter (Mandatory = $False)]
     # vRNI Connection object
@@ -1613,13 +1615,15 @@ function Set-vRNIDataSourceSNMPConfig {
       # if SNMPv3 parameters are given, build the snmp_3 var
       if ($pscmdlet.ParameterSetName -eq "SNMPv3") {
         $requestFormat.snmp_version = "v3"
+        $Authentication = New-Object System.Management.Automation.PSCredential("", $AuthenticationPassword)
+        $Privacy = New-Object System.Management.Automation.PSCredential("", $PrivacyPassword)
         $requestFormat.config_snmp_3 = @{
           "username"                = $Username
           "context_name"            = $ContextName
           "authentication_type"     = $AuthenticationType
-          "authentication_password" = $AuthenticationPassword
+          "authentication_password" = $Authentication.GetNetworkCredential().Password
           "privacy_type"            = $PrivacyType
-          "privacy_password"        = $PrivacyPassword
+          "privacy_password"        = $Privacy.GetNetworkCredential().Password
         }
       }
 
@@ -4147,7 +4151,7 @@ function Set-vRNIUserPassword {
     [string]$Username,
     [Parameter (Mandatory = $false)]
     # Their new password
-    [string]$NewPassword,
+    [securestring]$NewPassword,
     [Parameter (Mandatory = $false)]
     # PSCredential object containing credentials to update
     [PSCredential]$Credential,
@@ -4172,7 +4176,7 @@ function Set-vRNIUserPassword {
     }
     # If the password has been given in cleartext,
     else {
-      $user_credentials = New-Object System.Management.Automation.PSCredential($Username, $(ConvertTo-SecureString $NewPassword -AsPlainText -Force))
+      $user_credentials = New-Object System.Management.Automation.PSCredential($Username, $NewPassword)
     }
   }
   # If a credential object was given as a parameter, use that
