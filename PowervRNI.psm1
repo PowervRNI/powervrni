@@ -450,7 +450,7 @@ function Connect-vRNIServer {
   }
 
   # Figure out if the username is a local or remote username
-  $parts = $Username.split("@")
+  $parts = $requestFormat.username.split("@")
   # If no domain param is given, use the default LOCAL domain and populate the "domain" field
   if ($parts[1] -eq "local" -Or $UseLocalAuth -eq $True -Or $Domain -eq "LOCAL") {
     $requestFormat.domain = @{
