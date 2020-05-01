@@ -370,30 +370,33 @@ function Connect-vRNIServer {
 
   .EXAMPLE
   PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
-  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password $mysecpassword
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -SecurePassword $mysecpassword
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
   with the given local credentials. Returns the connection object, if successful.
 
   .EXAMPLE
   PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
-  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password $mysecpassword
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -SecurePassword $mysecpassword
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
   with the given LDAP credentials. Returns the connection object, if successful.
 
   .EXAMPLE
   PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
-  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password $mysecpassword -UseLocalAuth
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -SecurePassword $mysecpassword -UseLocalAuth
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
   with the given LOCAL credentials. Returns the connection object, if successful.
 
   .EXAMPLE
   PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
-  PS C:\> $MyConnection = Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password $mysecpassword
+  PS C:\> $MyConnection = Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -SecurePassword $mysecpassword
   PS C:\> Get-vRNIDataSource -Connection $MyConnection
   Connects to vRNI with the given credentials and then uses the returned
   connection object in the next cmdlet to retrieve all datasources from
   that specific vRNI instance.
   #>
+  [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingConvertToSecureStringWithPlainText", "")]
+  [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingUsernameAndPasswordParams", "")]
+  [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingPlainTextForPassword", "")]
   param (
     [Parameter (Mandatory = $true)]
     # vRNI Platform hostname or IP address
@@ -406,7 +409,10 @@ function Connect-vRNIServer {
     [Parameter (Mandatory = $false)]
     # Password to use to login to vRNI
     [ValidateNotNullOrEmpty()]
-    [securestring]$Password,
+    [string]$Password,
+    # Password to use to login to vRNI
+    [ValidateNotNullOrEmpty()]
+    [securestring]$SecurePassword,
     [Parameter (Mandatory = $false)]
     #PSCredential object containing NSX API authentication credentials
     [PSCredential]$Credential,
@@ -422,20 +428,28 @@ function Connect-vRNIServer {
 
   # Make sure either -Credential is set, or both -Username and -Password
   if (($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Username")) -Or
-    ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Password"))) {
-    throw "Specify either -Credential or -Username to authenticate (if using -Username and omitting -Password, a prompt will be given)"
+    ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Password")) -Or
+    ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("SecurePassword"))) {
+    throw "Specify either -Credential or -Username to authenticate (if using -Username and omitting -SecurePassword, a prompt will be given)"
   }
 
   # Build cred object for default auth if user specified username/pass
   $connection_credentials = ""
   if ($PsBoundParameters.ContainsKey("Username")) {
     # Is the -Password omitted? Prompt securely
-    if (!$PsBoundParameters.ContainsKey("Password")) {
+    if (!($PsBoundParameters.ContainsKey("Password") -or $PsBoundParameters.ContainsKey("SecurePassword"))) {
       $connection_credentials = Get-Credential -UserName $Username -Message "vRealize Network Insight Platform Authentication"
     }
     # If the password has been given in cleartext,
     else {
-      $connection_credentials = New-Object System.Management.Automation.PSCredential($Username, $Password)
+      if ($PsBoundParameters.ContainsKey("Password")) {
+        $connection_credentials = New-Object System.Management.Automation.PSCredential($Username, (ConvertTo-SecureString $Password -AsPlainText -Force))
+      }
+      else {
+        #SecurePassword
+        $connection_credentials = New-Object System.Management.Automation.PSCredential($Username, $SecurePassword)
+      }
+
     }
   }
   # If a credential object was given as a parameter, use that
@@ -596,8 +610,7 @@ function Connect-NIServer {
   }
 }
 
-function Connect-NIBetaServer
-{
+function Connect-NIBetaServer {
   <#
   .SYNOPSIS
   Connects to a beta instance of Network Insight Service on the VMware Cloud Services
@@ -615,22 +628,22 @@ function Connect-NIBetaServer
   PS C:\> Connect-NIBetaServer -AuthToken 'eyJ0...extremelylongstring..u5hyuA' -BetaURL ndnibeta7.us.api.main.vrni-symphony.com
   #>
   param (
-    [Parameter (Mandatory=$true)]
-      # The AuthToken value after logging in
-      [ValidateNotNullOrEmpty()]
-      [string]$AuthToken,
-    [Parameter (Mandatory=$true)]
-      # The hostname/URL of the beta instance
-      [ValidateNotNullOrEmpty()]
-      [string]$BetaURL
+    [Parameter (Mandatory = $true)]
+    # The AuthToken value after logging in
+    [ValidateNotNullOrEmpty()]
+    [string]$AuthToken,
+    [Parameter (Mandatory = $true)]
+    # The hostname/URL of the beta instance
+    [ValidateNotNullOrEmpty()]
+    [string]$BetaURL
   )
 
   # Setup a custom object to contain the parameters of the connection, including the URL to the CSP API & Access token
   $connection = [pscustomObject] @{
-    "Server" = "$($BetaURL)/ni"
-    "CSPToken" = $AuthToken
+    "Server"          = "$($BetaURL)/ni"
+    "CSPToken"        = $AuthToken
     ## the expiration of the token; currently (vRNI API v1.0), tokens are valid for five (5) hours
-    "AuthTokenExpiry" = (Get-Date).AddSeconds(5*60*60).ToLocalTime()
+    "AuthTokenExpiry" = (Get-Date).AddSeconds(5 * 60 * 60).ToLocalTime()
   }
 
   # Remember this as the default connection
