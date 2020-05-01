@@ -592,8 +592,7 @@ function Connect-NIServer {
   }
 }
 
-function Connect-NIBetaServer
-{
+function Connect-NIBetaServer {
   <#
   .SYNOPSIS
   Connects to a beta instance of Network Insight Service on the VMware Cloud Services
@@ -611,22 +610,22 @@ function Connect-NIBetaServer
   PS C:\> Connect-NIBetaServer -AuthToken 'eyJ0...extremelylongstring..u5hyuA' -BetaURL ndnibeta7.us.api.main.vrni-symphony.com
   #>
   param (
-    [Parameter (Mandatory=$true)]
-      # The AuthToken value after logging in
-      [ValidateNotNullOrEmpty()]
-      [string]$AuthToken,
-    [Parameter (Mandatory=$true)]
-      # The hostname/URL of the beta instance
-      [ValidateNotNullOrEmpty()]
-      [string]$BetaURL
+    [Parameter (Mandatory = $true)]
+    # The AuthToken value after logging in
+    [ValidateNotNullOrEmpty()]
+    [string]$AuthToken,
+    [Parameter (Mandatory = $true)]
+    # The hostname/URL of the beta instance
+    [ValidateNotNullOrEmpty()]
+    [string]$BetaURL
   )
 
   # Setup a custom object to contain the parameters of the connection, including the URL to the CSP API & Access token
   $connection = [pscustomObject] @{
-    "Server" = "$($BetaURL)/ni"
-    "CSPToken" = $AuthToken
+    "Server"          = "$($BetaURL)/ni"
+    "CSPToken"        = $AuthToken
     ## the expiration of the token; currently (vRNI API v1.0), tokens are valid for five (5) hours
-    "AuthTokenExpiry" = (Get-Date).AddSeconds(5*60*60).ToLocalTime()
+    "AuthTokenExpiry" = (Get-Date).AddSeconds(5 * 60 * 60).ToLocalTime()
   }
 
   # Remember this as the default connection
