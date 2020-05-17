@@ -592,53 +592,6 @@ function Connect-NIServer {
   }
 }
 
-function Connect-NIBetaServer
-{
-  <#
-  .SYNOPSIS
-  Connects to a beta instance of Network Insight Service on the VMware Cloud Services
-  Platform and constructs a connection object.
-
-  .DESCRIPTION
-  This is only to be used for the beta instances of vRNI Cloud. These instances do not
-  have the full CSP integration, so refresh tokens cannot be used. The AuthToken parameter
-  needs to come from the browswer developer tools, after you've logged in manually.
-
-  Look for the POST call to /login-csp and copy the extreme long string that's in the
-  response header Set-Cookie; you're looking for the value of csp-auth-token.
-
-  .EXAMPLE
-  PS C:\> Connect-NIBetaServer -AuthToken 'eyJ0...extremelylongstring..u5hyuA' -BetaURL ndnibeta7.us.api.main.vrni-symphony.com
-  #>
-  param (
-    [Parameter (Mandatory=$true)]
-      # The AuthToken value after logging in
-      [ValidateNotNullOrEmpty()]
-      [string]$AuthToken,
-    [Parameter (Mandatory=$true)]
-      # The hostname/URL of the beta instance
-      [ValidateNotNullOrEmpty()]
-      [string]$BetaURL
-  )
-
-  # Setup a custom object to contain the parameters of the connection, including the URL to the CSP API & Access token
-  $connection = [pscustomObject] @{
-    "Server" = "$($BetaURL)/ni"
-    "CSPToken" = $AuthToken
-    ## the expiration of the token; currently (vRNI API v1.0), tokens are valid for five (5) hours
-    "AuthTokenExpiry" = (Get-Date).AddSeconds(5*60*60).ToLocalTime()
-  }
-
-  # Remember this as the default connection
-  Set-Variable -name defaultvRNIConnection -value $connection -scope Global
-
-  # Retrieve the API version so we can use that in determining if we can use newer API endpoints
-  $Script:vRNI_API_Version = [System.Version]((Get-vRNIAPIVersion).api_version)
-
-  # Return the connection
-  $connection
-}
-
 #####################################################################################################################
 #####################################################################################################################
 #######################################  Infrastructure Management ##################################################
