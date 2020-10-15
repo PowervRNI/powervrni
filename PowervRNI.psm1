@@ -1458,6 +1458,10 @@ function Update-vRNIDataSource {
       throw "Provide at least one parameter to update!"
     }
 
+    if (($Username -ne "" -And $Password -eq "") -Or ($Password -ne "" -And $Username -eq "")) {
+      throw "Provide both the -Username and -Password to update credentials"
+    }
+
     $DataSource | Foreach-Object {
       $oThisDatasource = $_
 
@@ -1467,11 +1471,9 @@ function Update-vRNIDataSource {
         $oThisDatasource.nickname = $Nickname
       }
       if ($Username -ne "") {
-        $oThisDatasource.credentials.username = $Username
-
-      }
-      if ($Password -ne "") {
-        $oThisDatasource.credentials.password = $Password
+        $oThisDatasource.credentials = @{}
+        $oThisDatasource.credentials.Add('username', $Username)
+        $oThisDatasource.credentials.Add('password', $Password)
       }
       if ($Notes -ne "") {
         if ($null -eq $oThisDatasource.notes) {
