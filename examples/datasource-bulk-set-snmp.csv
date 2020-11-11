@@ -1,0 +1,16 @@
+Nickname;NewSnmpCommunity
+cat3k.lab.local;public
+cat45k.lab.local;public
+cat65k.lab.local;public
+n5k.lab.local;public
+n7k.lab.local;public
+n9k.lab.local;public
+arista.lab.local;public
+dellf10mlx10.lab.local;public
+dellp8024.lab.local;public
+dell54048.lab.local;public
+dell29100.lab.local;public
+dell56000.lab.local;public
+brocade.lab.local;public
+juniper.lab.local;public
+ucs.lab.local;public
