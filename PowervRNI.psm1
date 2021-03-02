@@ -18,6 +18,7 @@ $Script:DatasourceURLs.Add("juniperswitch", @("/data-sources/juniper-switches"))
 $Script:DatasourceURLs.Add("ciscoucs", @("/data-sources/ucs-managers"))
 $Script:DatasourceURLs.Add("hponeview", @("/data-sources/hpov-managers"))
 $Script:DatasourceURLs.Add("hpvcmanager", @("/data-sources/hpvc-managers"))
+$Script:DatasourceURLs.Add("hpeswitch", @("/data-sources/hpe-switches"))
 $Script:DatasourceURLs.Add("checkpointfirewall", @("/data-sources/checkpoint-firewalls"))
 $Script:DatasourceURLs.Add("panfirewall", @("/data-sources/panorama-firewalls"))
 $Script:DatasourceURLs.Add("infoblox", @("/data-sources/infoblox-managers"))
@@ -33,6 +34,9 @@ $Script:DatasourceURLs.Add("velocloud", @("/data-sources/velocloud"))
 $Script:DatasourceURLs.Add("azure", @("/data-sources/azure-subscriptions"))
 $Script:DatasourceURLs.Add("fortimanager", @("/data-sources/fortinet-firewalls"))
 $Script:DatasourceURLs.Add("generic-device", @("/data-sources/generic-switches"))
+$Script:DatasourceURLs.Add("mellanoxswitch", @("/data-sources/mellanox-switches"))
+$Script:DatasourceURLs.Add("hcxconnector", @("/data-sources/hcx-connectors"))
+$Script:DatasourceURLs.Add("awsaccount", @("/data-sources/aws-accounts"))
 
 # Collect a list of all data source URLs to be used to retrieve "all" data sources
 $allURLs = New-Object System.Collections.Generic.List[System.Object]
@@ -54,6 +58,7 @@ $Script:DatasourceInternalURLs.Add("JuniperSwitchDataSource", "/data-sources/jun
 $Script:DatasourceInternalURLs.Add("UCSManagerDataSource", "/data-sources/ucs-managers")
 $Script:DatasourceInternalURLs.Add("HPOneViewManagerDataSource", "/data-sources/hpov-managers")
 $Script:DatasourceInternalURLs.Add("HPVCManagerDataSource", "/data-sources/hpvc-managers")
+$Script:DatasourceInternalURLs.Add("HPESwitchDataSource", "/data-sources/hpe-switches")
 $Script:DatasourceInternalURLs.Add("CheckpointFirewallDataSource", "/data-sources/checkpoint-firewalls")
 $Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panorama-firewalls")
 $Script:DatasourceInternalURLs.Add("InfobloxManagerDataSource", "/data-sources/infoblox-managers")
@@ -66,8 +71,11 @@ $Script:DatasourceInternalURLs.Add("KubernetesDataSource", "/data-sources/kubern
 $Script:DatasourceInternalURLs.Add("ServiceNowDataSource", "/data-sources/servicenow-instances")
 $Script:DatasourceInternalURLs.Add("VeloCloudDataSource", "/data-sources/velocloud")
 $Script:DatasourceInternalURLs.Add("AzureDataSource", "/data-sources/azure-subscriptions")
+$Script:DatasourceInternalURLs.Add("AWSDataSource", "/data-sources/aws-accounts")
 $Script:DatasourceInternalURLs.Add("FortinetFirewallDataSource", "/data-sources/fortinet-firewalls")
 $Script:DatasourceInternalURLs.Add("GenericSwitchDataSource", "/data-sources/generic-switches")
+$Script:DatasourceInternalURLs.Add("MellanoxSwitchDataSource", "/data-sources/mellanox-switches")
+$Script:DatasourceInternalURLs.Add("HcxDataSource", "/data-sources/hcx-connectors")
 
 # This list will be used in Get-vRNIEntity to map entity URLs to their IDs so we can use those IDs in /entities/fetch
 $Script:EntityURLtoIdMapping = @{ }
