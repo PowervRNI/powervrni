@@ -1,7 +1,7 @@
 # VMware vRealize Network Insight PowerShell module
 # Martijn Smit (@smitmartijn)
 # msmit@vmware.com
-# Version 1.8
+# Version 1.9
 
 
 # Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource
@@ -730,6 +730,296 @@ function Get-vRNIAPIVersion {
 
 #####################################################################################################################
 #####################################################################################################################
+#######################################      Backup Management     ##################################################
+#####################################################################################################################
+#####################################################################################################################
+
+function Get-vRNIBackup {
+  <#
+  .SYNOPSIS
+  Retrieve the settings of the backup of the vRealize Network Insight Platform configuration.
+
+  .DESCRIPTION
+  You can create scheduled backups of the vRealize Network Insight Platform configuration,
+  this cmdlet retrieves the settings of the backup.
+
+  If the invocation returns a 404 error; the backup is not configured.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIBackup
+  Returns the current settings of the backup
+  #>
+  param (
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  $conf = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/settings/backup"
+  $conf
+}
+
+function Get-vRNIBackupStatus {
+  <#
+  .SYNOPSIS
+  Retrieve the status of the backup of the vRealize Network Insight Platform configuration.
+
+  .DESCRIPTION
+  You can create scheduled backups of the vRealize Network Insight Platform configuration,
+  this cmdlet retrieves the status of the backup.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIBackupStatus
+  Returns the current status of the backup
+  #>
+  param (
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  $status = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/settings/backup/status"
+  $status
+}
+
+function Remove-vRNIBackup {
+  <#
+  .SYNOPSIS
+  Removes the backup configuration of the vRealize Network Insight Platform configuration.
+
+  .DESCRIPTION
+  You can create scheduled backups of the vRealize Network Insight Platform configuration,
+  this cmdlet removes the current configuration of the backup.
+
+  If the invocation returns a 404 error; the backup is not configured.
+
+  .EXAMPLE
+  PS C:\> Remove-vRNIBackup
+  Removes the current configuration of the backup
+  #>
+  param (
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  $status = Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -URI "/api/ni/settings/backup"
+  $status
+}
+
+function Enable-vRNIBackup {
+  <#
+  .SYNOPSIS
+  Enables the backup configuration of the vRealize Network Insight Platform configuration.
+
+  .DESCRIPTION
+  You can create scheduled backups of the vRealize Network Insight Platform configuration,
+  this cmdlet enables the current configuration of the backup.
+
+  If the invocation returns a 404 error; the backup is not configured.
+
+  .EXAMPLE
+  PS C:\> Enable-vRNIBackup
+  Enables the current configuration of the backup
+  #>
+  param (
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  $status = Invoke-vRNIRestMethod -Connection $Connection -Method POST -URI "/api/ni/settings/backup/enable"
+  $status
+}
+
+function Disable-vRNIBackup {
+  <#
+  .SYNOPSIS
+  Disables the backup configuration of the vRealize Network Insight Platform configuration.
+
+  .DESCRIPTION
+  You can create scheduled backups of the vRealize Network Insight Platform configuration,
+  this cmdlet disables the current configuration of the backup.
+
+  If the invocation returns a 404 error; the backup is not configured.
+
+  .EXAMPLE
+  PS C:\> Disable-vRNIBackup
+  Disables the current configuration of the backup
+  #>
+  param (
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  $status = Invoke-vRNIRestMethod -Connection $Connection -Method POST -URI "/api/ni/settings/backup/disable"
+  $status
+}
+
+function Set-vRNIBackup {
+  <#
+  .SYNOPSIS
+  Configures the backup configuration of the vRealize Network Insight Platform configuration.
+
+  .DESCRIPTION
+  You can create scheduled backups of the vRealize Network Insight Platform configuration,
+  this cmdlet configures the backup.
+
+  .EXAMPLE
+  PS C:\> $backupSchedule = @{ "enable" = $true; "schedule_period" = "DAILY"; "minute" = 30; "hour" = 12; "day_of_week" = 1 }
+  PS C:\> $sshServer = @{ "server_address" = "10.0.0.10"; "port" = 22; "username" = "backups"; "password" = "VMware1!"; "backup_directory" = "/home/backups/"; "backup_file_name" = "vrni-backup.tar" }
+  PS C:\> Set-vRNIBackup -RunNow $true -BackupSchedule $backupSchedule -SSHServer $sshServer
+
+  Configure scheduled backups of once a day at 12:30 to a SSH server, and create a backup now.
+
+  .EXAMPLE
+  PS C:\> $backupSchedule = @{ "enable" = $true; "schedule_period" = "WEEKLY"; "minute" = 30; "hour" = 12; "day_of_week" = 0 }
+  PS C:\> $ftpServer = @{ "server_address" = "10.0.0.10"; "port" = 21; "username" = "backups"; "password" = "VMware1!"; "backup_directory" = "/home/backups/"; "backup_file_name" = "vrni-backup.tar" }
+  PS C:\> Set-vRNIBackup -RunNow $true -BackupSchedule $backupSchedule -FTPServer $ftpServer
+
+  Configure scheduled backups of once a week on Sunday (day_of_week follows cron syntax) at 12:30 to a FTP server, and create a backup now.
+
+  .EXAMPLE
+  PS C:\> $backupSchedule = @{ "enable" = $true; "schedule_period" = "DAILY"; "minute" = 30; "hour" = 11; "day_of_week" = 0 }
+  PS C:\> $localServer = @{ "backup_directory" = "/home/support/backups/"; "backup_file_name" = "vrni-backup.tar" }
+  PS C:\> Set-vRNIBackup -RunNow $true -BackupSchedule $backupSchedule -LocalServer $localServer
+
+  Configure scheduled backups daily at 11:30 to the local Platform filesystem, and don't create a backup now.
+  #>
+  param (
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection,
+
+    [Parameter (Mandatory = $true)]
+    # Whether or not we want to run the backup right away
+    [ValidateNotNullOrEmpty()]
+    [bool]$RunNow = $True,
+
+    [Parameter (Mandatory = $true)]
+    # Whether or not we want to run the backup right away
+    [ValidateNotNullOrEmpty()]
+    [hashtable]$BackupSchedule,
+
+    [Parameter (Mandatory = $false, ParameterSetName = "SSH")]
+    # The details of the
+    [ValidateNotNullOrEmpty()]
+    [hashtable]$SSHServer,
+
+    [Parameter (Mandatory = $false, ParameterSetName = "FTP")]
+    # Whether or not we want to run the backup right away
+    [ValidateNotNullOrEmpty()]
+    [hashtable]$FTPServer,
+
+    [Parameter (Mandatory = $false, ParameterSetName = "LOCAL")]
+    # Whether or not we want to run the backup right away
+    [ValidateNotNullOrEmpty()]
+    [hashtable]$LocalServer,
+
+    [Parameter(Mandatory = $false)]
+    [ValidateSet("applications", "snmp", "smtp", "data_sources", "analytics_thresholds", "analytics_outliers", "events", "syslog", "pinboards", "ldap", "vidm", "user_data", "user_preferences", "physical_subnet_vlan", "saved_searches", "physical_ip_dns_mapping", "east_west_ip", "north_south_ip")]
+    [String[]]$FilterSections
+  )
+
+  # Allow only 1 backup method
+  $methods = 0
+  if ($SSHServer.Keys.Count -gt 0) { $methods += 1 }
+  if ($FTPServer.Keys.Count -gt 0) { $methods += 1 }
+  if ($LocalServer.Keys.Count -gt 0) { $methods += 1 }
+  if ($methods -gt 1) {
+    throw "Only 1 backup method may be enabled"
+  }
+  if ($methods -eq 0) {
+    throw "Please enable a backup method using -SSHServer, -FTPServer, or -LocalServer"
+  }
+
+  # Warning for local storage
+  if ($PSCmdlet.ParameterSetName -eq "LOCAL") {
+    Write-Host -ForegroundColor "yellow" "You've indicated to store the backup on the local vRNI appliance. Make sure you know what you're doing!"
+  }
+
+  # Format request with all given data
+  $requestFormat = @{
+    "schedule_now"    = $RunNow
+    "backup_schedule" = $BackupSchedule
+  }
+
+  # Add backup method
+  if ($PSCmdlet.ParameterSetName -eq "SSH") {
+    $requestFormat.backup_file_server_type = "SSH"
+    $requestFormat.ssh_file_server = $SSHServer
+  }
+  if ($PSCmdlet.ParameterSetName -eq "FTP") {
+    $requestFormat.backup_file_server_type = "FTP"
+    $requestFormat.ftp_file_server = $FTPServer
+  }
+  if ($PSCmdlet.ParameterSetName -eq "LOCAL") {
+    $requestFormat.backup_file_server_type = "LOCAL"
+    $requestFormat.local_file_server = $LocalServer
+  }
+
+  # Figure out which config sections we want to backup
+  # Default to enable the section and only disable the section when they appear in -FilterSections
+  $config_filter = @{}
+
+  $config_filter.applications = $true
+  $config_filter.snmp = $true
+  $config_filter.smtp = $true
+  $config_filter.data_sources = $true
+  $config_filter.analytics_thresholds = $true
+  $config_filter.analytics_outliers = $true
+  $config_filter.events = $true
+  $config_filter.syslog = $true
+  $config_filter.pinboards = $true
+  $config_filter.ldap = $true
+  $config_filter.vidm = $true
+  $config_filter.user_data = $true
+  $config_filter.user_preferences = $true
+  $config_filter.physical_subnet_vlan = $true
+  $config_filter.saved_searches = $true
+  $config_filter.physical_ip_dns_mapping = $true
+  $config_filter.east_west_ip = $true
+  $config_filter.north_south_ip = $true
+
+  if ($FilterSections.Length) {
+    if ($FilterSections.Contains('applications')) { $config_filter.applications = $false }
+    if ($FilterSections.Contains('snmp')) { $config_filter.snmp = $false }
+    if ($FilterSections.Contains('smtp')) { $config_filter.smtp = $false }
+    if ($FilterSections.Contains('data_sources')) { $config_filter.data_sources = $false }
+    if ($FilterSections.Contains('analytics_thresholds')) { $config_filter.analytics_thresholds = $false }
+    if ($FilterSections.Contains('analytics_outliers')) { $config_filter.analytics_outliers = $false }
+    if ($FilterSections.Contains('events')) { $config_filter.events = $false }
+    if ($FilterSections.Contains('syslog')) { $config_filter.syslog = $false }
+    if ($FilterSections.Contains('pinboards')) { $config_filter.pinboards = $false }
+    if ($FilterSections.Contains('ldap')) { $config_filter.ldap = $false }
+    if ($FilterSections.Contains('vidm')) { $config_filter.vidm = $false }
+    if ($FilterSections.Contains('user_data')) { $config_filter.user_data = $false }
+    if ($FilterSections.Contains('user_preferences')) { $config_filter.user_preferences = $false }
+    if ($FilterSections.Contains('physical_subnet_vlan')) { $config_filter.physical_subnet_vlan = $false }
+    if ($FilterSections.Contains('saved_searches')) { $config_filter.saved_searches = $false }
+    if ($FilterSections.Contains('physical_ip_dns_mapping')) { $config_filter.physical_ip_dns_mapping = $false }
+    if ($FilterSections.Contains('east_west_ip')) { $config_filter.east_west_ip = $false }
+    if ($FilterSections.Contains('north_south_ip')) { $config_filter.north_south_ip = $false }
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+
+  # Configure backup!
+  $status = Invoke-vRNIRestMethod -Connection $Connection -Method POST -URI "/api/ni/settings/backup" -Body $requestBody
+  $status
+}
+
+
+#####################################################################################################################
+#####################################################################################################################
 ########################################  Datasource Management #####################################################
 #####################################################################################################################
 #####################################################################################################################
@@ -841,7 +1131,10 @@ function New-vRNIDataSource {
   correlate and display this data in the interfce.
 
   .EXAMPLE
-  PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
+  PS C:\> $mysecpassword = ConvertTo-
+  
+  
+  secret -AsPlainText -Force
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
   PS C:\> New-vRNIDataSource -DataSourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password $mysecpassword -CollectorVMId $collectorId -Nickname vc.nsx.local
 
@@ -1234,6 +1527,10 @@ function Update-vRNIDataSource {
 
     if ($Nickname -eq "" -And $Username -eq "" -And $Password -eq "" -And $Notes -eq "") {
       throw "Provide at least one parameter to update!"
+    }
+
+    if (($Username -ne "" -And $Password -eq "") -Or ($Password -ne "" -And $Username -eq "")) {
+      throw "Provide both the -Username and -Password to update credentials"
     }
 
     $DataSource | Foreach-Object {
@@ -4274,7 +4571,8 @@ function New-DynamicParameter {
   <#
   .NOTES
   Credits to jrich523 and ramblingcookiemonster for their initial code and inspiration:
-      https://github.com/RamblingCookieMonster/PowerShell/blob/master/New-DynamicParam.ps1
+      https://github.com/RamblingCookieMonster/PowerShell/blob/
+      /New-DynamicParam.ps1
       http://ramblingcookiemonster.wordpress.com/2014/11/27/quick-hits-credentials-and-dynamic-parameters/
       http://jrich523.wordpress.com/2013/05/30/powershell-simple-way-to-add-dynamic-parameters-to-advanced-function/
 
