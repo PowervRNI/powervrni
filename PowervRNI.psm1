@@ -430,7 +430,7 @@ function Connect-vRNIServer {
   $connection_credentials = ""
   if ($PsBoundParameters.ContainsKey("Username")) {
     # Is the -Password omitted? Prompt securely
-    if (!($PsBoundParameters.ContainsKey("SecurePassword"))) {
+    if (!($PsBoundParameters.ContainsKey("Password"))) {
       $connection_credentials = Get-Credential -UserName $Username -Message "vRealize Network Insight Platform Authentication"
     }
     # If the password has been given in cleartext,
