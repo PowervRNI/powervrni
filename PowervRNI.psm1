@@ -4121,7 +4121,138 @@ function Get-vRNIAuditLogs {
   $logs
 }
 
+#####################################################################################################################
+#####################################################################################################################
+#######################################     License Management    ###################################################
+#####################################################################################################################
+#####################################################################################################################
 
+function Get-vRNILicense {
+  <#
+  .SYNOPSIS
+  Retrieve all activated licenses and their usage from vRealize Network Insight
+
+  .DESCRIPTION
+  vRealize Network Insight requires licenses to be operational. This function retrieves
+  the current activated licenses and the number of objects attached to these licenses.
+
+  .EXAMPLE
+  PS C:\> Get-vRNILicense
+
+  #>
+  param (
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method GET -Uri "/api/ni/settings/licensing"
+  return $results.result
+}
+
+function Invoke-vRNILicenseValidate {
+  <#
+  .SYNOPSIS
+  Validates whether a license key is valid for vRealize Network Insight
+
+  .DESCRIPTION
+  vRealize Network Insight requires licenses to be operational. This function checks the
+  validity of a given license key
+
+  .EXAMPLE
+  PS C:\> Invoke-vRNILicenseValidate -LicenseKey 'xxxx-xxxx-xxxx-xxxx'
+
+  #>
+  param (
+    [Parameter (Mandatory = $True)]
+    # License key to be validated
+    [string]$LicenseKey,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = @{
+    "licenseKey" = $LicenseKey
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/licensing/validate" -Body $requestBody
+  return $results.result
+}
+
+function New-vRNILicense {
+  <#
+  .SYNOPSIS
+  Activates a license key in vRealize Network Insight
+
+  .DESCRIPTION
+  vRealize Network Insight requires licenses to be operational. This function add a new
+  license key to vRNI
+
+  .EXAMPLE
+  PS C:\> New-vRNILicense -LicenseKey 'xxxx-xxxx-xxxx-xxxx'
+
+  #>
+  param (
+    [Parameter (Mandatory = $True)]
+    # License key to be activated
+    [string]$LicenseKey,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = @{
+    "licenseKey" = $LicenseKey
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/licensing/activate" -Body $requestBody
+  return $results.result
+}
+
+
+function Remove-vRNILicense {
+  <#
+  .SYNOPSIS
+  Activates a license key in vRealize Network Insight
+
+  .DESCRIPTION
+  vRealize Network Insight requires licenses to be operational. This function removes a
+  license key from vRNI
+
+  .EXAMPLE
+  PS C:\> Remove-vRNILicense -LicenseKey 'xxxx-xxxx-xxxx-xxxx'
+
+  #>
+  param (
+    [Parameter (Mandatory = $True)]
+    # License key to be removed
+    [string]$LicenseKey,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = @{
+    "licenseKey" = $LicenseKey
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $results = Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri "/api/ni/settings/licensing/deactivate" -Body $requestBody
+  return $results.result
+}
 
 #####################################################################################################################
 #####################################################################################################################
