@@ -394,9 +394,6 @@ function Connect-vRNIServer {
   connection object in the next cmdlet to retrieve all datasources from
   that specific vRNI instance.
   #>
-  [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingConvertToSecureStringWithPlainText", "")]
-  [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingUsernameAndPasswordParams", "")]
-  [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingPlainTextForPassword", "")]
   param (
     [Parameter (Mandatory = $true)]
     # vRNI Platform hostname or IP address
@@ -409,10 +406,7 @@ function Connect-vRNIServer {
     [Parameter (Mandatory = $false)]
     # Password to use to login to vRNI
     [ValidateNotNullOrEmpty()]
-    [string]$Password,
-    # Password to use to login to vRNI
-    [ValidateNotNullOrEmpty()]
-    [securestring]$SecurePassword,
+    [securestring]$Password,
     [Parameter (Mandatory = $false)]
     #PSCredential object containing NSX API authentication credentials
     [PSCredential]$Credential,
@@ -428,7 +422,6 @@ function Connect-vRNIServer {
 
   # Make sure either -Credential is set, or both -Username and -Password
   if (($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Username")) -Or
-    ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Password")) -Or
     ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("SecurePassword"))) {
     throw "Specify either -Credential or -Username to authenticate (if using -Username and omitting -SecurePassword, a prompt will be given)"
   }
@@ -437,19 +430,12 @@ function Connect-vRNIServer {
   $connection_credentials = ""
   if ($PsBoundParameters.ContainsKey("Username")) {
     # Is the -Password omitted? Prompt securely
-    if (!($PsBoundParameters.ContainsKey("Password") -or $PsBoundParameters.ContainsKey("SecurePassword"))) {
+    if (!($PsBoundParameters.ContainsKey("SecurePassword"))) {
       $connection_credentials = Get-Credential -UserName $Username -Message "vRealize Network Insight Platform Authentication"
     }
     # If the password has been given in cleartext,
     else {
-      if ($PsBoundParameters.ContainsKey("Password")) {
-        $connection_credentials = New-Object System.Management.Automation.PSCredential($Username, (ConvertTo-SecureString $Password -AsPlainText -Force))
-      }
-      else {
-        #SecurePassword
-        $connection_credentials = New-Object System.Management.Automation.PSCredential($Username, $SecurePassword)
-      }
-
+      $connection_credentials = New-Object System.Management.Automation.PSCredential($Username, $Password)
     }
   }
   # If a credential object was given as a parameter, use that
@@ -1132,8 +1118,8 @@ function New-vRNIDataSource {
 
   .EXAMPLE
   PS C:\> $mysecpassword = ConvertTo-
-  
-  
+
+
   secret -AsPlainText -Force
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
   PS C:\> New-vRNIDataSource -DataSourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password $mysecpassword -CollectorVMId $collectorId -Nickname vc.nsx.local
