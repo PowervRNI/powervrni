@@ -34,6 +34,10 @@ $Script:DatasourceURLs.Add("velocloud", @("/data-sources/velocloud"))
 $Script:DatasourceURLs.Add("azure", @("/data-sources/azure-subscriptions"))
 $Script:DatasourceURLs.Add("fortimanager", @("/data-sources/fortinet-firewalls"))
 $Script:DatasourceURLs.Add("generic-device", @("/data-sources/generic-switches"))
+$Script:DatasourceURLs.Add("mellanoxswitch", @("/data-sources/mellanox-switches"))
+$Script:DatasourceURLs.Add("ciscoasrxrswitch", @("/data-sources/cisco-asrxr-switches"))
+$Script:DatasourceURLs.Add("hcxconnector", @("/data-sources/hcx-connectors"))
+$Script:DatasourceURLs.Add("aws", @("/data-sources/aws-accounts"))
 
 # Collect a list of all data source URLs to be used to retrieve "all" data sources
 $allURLs = New-Object System.Collections.Generic.List[System.Object]
@@ -59,7 +63,7 @@ $Script:DatasourceInternalURLs.Add("HPVCManagerDataSource", "/data-sources/hpvc-
 $Script:DatasourceInternalURLs.Add("CheckpointFirewallDataSource", "/data-sources/checkpoint-firewalls")
 $Script:DatasourceInternalURLs.Add("PanFirewallDataSource", "/data-sources/panorama-firewalls")
 $Script:DatasourceInternalURLs.Add("InfobloxManagerDataSource", "/data-sources/infoblox-managers")
-$Script:DatasourceInternalURLs.Add("PolicyManagerDataSource", "/data-sources/policy-managers")
+$Script:DatasourceInternalURLs.Add("PolicyManagerDataSource", "/data-sources/vmc-nsxmanagers")
 $Script:DatasourceInternalURLs.Add("F5BIGIPDataSource", "/data-sources/f5-bigip")
 $Script:DatasourceInternalURLs.Add("HuaweiSwitchDataSource", "/data-sources/huawei")
 $Script:DatasourceInternalURLs.Add("CiscoACIDataSource", "/data-sources/cisco-aci")
@@ -70,6 +74,10 @@ $Script:DatasourceInternalURLs.Add("VeloCloudDataSource", "/data-sources/veloclo
 $Script:DatasourceInternalURLs.Add("AzureDataSource", "/data-sources/azure-subscriptions")
 $Script:DatasourceInternalURLs.Add("FortinetFirewallDataSource", "/data-sources/fortinet-firewalls")
 $Script:DatasourceInternalURLs.Add("GenericSwitchDataSource", "/data-sources/generic-switches")
+$Script:DatasourceInternalURLs.Add("MellanoxSwitchDataSource", "/data-sources/mellanox-switches")
+$Script:DatasourceInternalURLs.Add("CiscoASRXRSwitchDataSource", "/data-sources/cisco-asrxr-switches")
+$Script:DatasourceInternalURLs.Add("HcxDataSource", "/data-sources/hcx-connectors")
+$Script:DatasourceInternalURLs.Add("AWSDataSource", "/data-sources/aws-accounts")
 
 # This list will be used in Get-vRNIEntity to map entity URLs to their IDs so we can use those IDs in /entities/fetch
 $Script:EntityURLtoIdMapping = @{ }
@@ -1181,7 +1189,8 @@ function New-vRNIDataSource {
     [ValidateNotNullOrEmpty()]
     [string]$ApplicationID,
     [Parameter (Mandatory = $true, ParameterSetName = "AZURE")]
-    # Azure Secret Key
+    [Parameter (ParameterSetName = "AWS")]
+    # Azure or AWS Secret Key
     [ValidateNotNullOrEmpty()]
     [string]$SecretKey,
     [Parameter (Mandatory = $true, ParameterSetName = "AZURE")]
@@ -1189,9 +1198,28 @@ function New-vRNIDataSource {
     [ValidateNotNullOrEmpty()]
     [string]$SubscriptionID,
     [Parameter (Mandatory = $false, ParameterSetName = "AZURE")]
+    [Parameter (ParameterSetName = "AWS")]
     # Retrieve Flows?
     [ValidateNotNullOrEmpty()]
     [bool]$FlowsEnabled = $True,
+
+    # These params are only required when adding an AWS account as data source
+    [Parameter (Mandatory = $true, ParameterSetName = "AWS")]
+    # AWS Access Key
+    [ValidateNotNullOrEmpty()]
+    [string]$AccessKey,
+    [Parameter (Mandatory = $false, ParameterSetName = "AWS")]
+    # Provide this switch when giving account is a master account and we want to index all linked accounts
+    [ValidateNotNullOrEmpty()]
+    [switch]$AddLinkedAccounts,
+    [Parameter (Mandatory = $false, ParameterSetName = "AWS")]
+    # Restrict collection from specific regions
+    [ValidateNotNullOrEmpty()]
+    [string]$RestrictToRegions = "",
+    [Parameter (Mandatory = $false, ParameterSetName = "AWS")]
+    # AWS Role ARN Suffix
+    [ValidateNotNullOrEmpty()]
+    [string]$RoleARNSuffix,
 
     [Parameter (Mandatory = $False, ParameterSetName = "KUBERNETES")]
     # KubeConfig as a string
@@ -1246,7 +1274,7 @@ function New-vRNIDataSource {
     }
 
     # Require username and password for everything except Azure, K8s, and OpenShift
-    if (($DataSourceType -ne "azure" -And $DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") -And ($Username -eq "" -Or $Password -eq "")) {
+    if (($DataSourceType -ne "aws" -And $DataSourceType -ne "azure" -And $DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") -And ($Username -eq "" -Or $Password -eq "")) {
       throw "Please provide the Username and Password parameters as the credentials to connect to the data source."
     }
 
@@ -1274,15 +1302,22 @@ function New-vRNIDataSource {
     if ($DataSourceType -eq "azure" -And $PSCmdlet.ParameterSetName -ne "AZURE") {
       throw "Please provide the TenantID, ApplicationID, SecretKey, and SubscriptionID parameters when adding an Azure subscription."
     }
+    if ($DataSourceType -eq "aws" -And $PSCmdlet.ParameterSetName -ne "AWS") {
+      throw "Please provide the AccessKey and SecretKey parameters when adding an AWS account. Optionally, provide the AddLinkedAccounts with RoleARNSuffix, RestrictToRegions, and FlowsEnabled parameters."
+    }
 
     # Format request with all given data
     $requestFormat = @{
-      "ip"       = $IP
-      "fqdn"     = $FDQN
       "proxy_id" = $CollectorVMId
       "nickname" = $Nickname
       "notes"    = $Notes
       "enabled"  = $Enabled
+    }
+
+    # Add IP or hostname to everything but SaaS accounts
+    if ($DataSourceType -ne "servicenow" -And $DataSourceType -ne "azure" -And $DataSourceType -ne "aws") {
+      $requestFormat.ip = $IP
+      $requestFormat.fqdn = $FDQN
     }
 
     # ServiceNow uses instance_id as the FQDN
@@ -1341,6 +1376,31 @@ function New-vRNIDataSource {
         "azure_key"          = $SecretKey
         "azure_tenant"       = $TenantID
         "azure_subscription" = $SubscriptionID
+      }
+    }
+
+    # Add the account details for AWS
+    if ($DataSourceType -eq "aws") {
+      $requestFormat.flows_enabled = $FlowsEnabled
+      $requestFormat.credentials = @{
+        "access_key" = $AccessKey
+        "secret_key" = $SecretKey
+      }
+
+      if ($AddLinkedAccounts.IsPresent) {
+        $requestFormat.add_linked_accounts = $True
+        $requestFormat.role_arn_suffix = $RoleARNSuffix
+      }
+      else {
+        $requestFormat.add_linked_accounts = $False
+      }
+
+      if ($RestrictToRegions -ne "") {
+        $requestFormat.enable_aws_geo_restrictions = $True
+        $requestFormat.selected_regions = $RestrictToRegions
+      }
+      else {
+        $requestFormat.enable_aws_geo_restrictions = $False
       }
     }
 
