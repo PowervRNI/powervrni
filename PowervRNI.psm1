@@ -1042,6 +1042,11 @@ function Get-vRNIDataSource {
     # Because each datasource type has its unique URL (/api/ni/data-sources/vcenter, /data-sources/ucs-manager, etc),
     # and we want all the datasource information, loop through the URLs of the types we want to retrieve and
     $datasource_types_to_get = $Script:DatasourceURLs.$DataSourceType
+
+    # Since vRNI 6.3 (API v1.2.0), we can GET /api/ni/data-sources. Override the URL if we're asking all data sources and are on v1.2.0
+    if ($DataSourceType -eq "all" -And $Script:vRNI_API_Version -ge [System.Version]"1.2.0") {
+      $datasource_types_to_get = @("/data-sources?size=500")
+    }
     foreach ($datasource_uri in $datasource_types_to_get) {
       # Energize!
       $response = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)"
@@ -1051,7 +1056,8 @@ function Get-vRNIDataSource {
       if ($response.results -ne "") {
         foreach ($datasource in $response.results) {
           # Retrieve datasource details and store it
-          $datasource_detail = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni$($datasource_uri)/$($datasource.entity_id)"
+          $URI = "/api/ni$($Script:DatasourceInternalURLs.$($datasource.entity_type))/$($datasource.entity_id)"
+          $datasource_detail = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI $URI
           $datasources.Add($datasource_detail) | Out-Null
         }
       }
