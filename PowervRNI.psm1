@@ -1045,7 +1045,7 @@ function Get-vRNIDataSource {
 
     # Since vRNI 6.3 (API v1.2.0), we can GET /api/ni/data-sources. Override the URL if we're asking all data sources and are on v1.2.0
     if ($DataSourceType -eq "all" -And $Script:vRNI_API_Version -ge [System.Version]"1.2.0") {
-      $datasource_types_to_get = @("/data-sources?size=500")
+      $datasource_types_to_get = @("/data-sources?size=500") # 500 = random crazy big number
     }
     foreach ($datasource_uri in $datasource_types_to_get) {
       # Energize!
@@ -1151,6 +1151,11 @@ function New-vRNIDataSource {
     # Optional notes for the datasource
     [ValidateNotNullOrEmpty()]
     [string]$Notes = "",
+
+    [Parameter (Mandatory = $false)]
+    # Optional polling interval in minutes. Not applicable to all data sources (mostly network devices)
+    [ValidateNotNullOrEmpty()]
+    [int]$PollingIntervalMinutes = 10,
 
     # These params are only required when adding a NSX Manager as datasource
     [Parameter (Mandatory = $False, ParameterSetName = "NSXDS")]
@@ -1297,7 +1302,6 @@ function New-vRNIDataSource {
       throw "Please provide the KubeConfig and NSXTManagerID parameters when adding an OpenShift or Kubernetes data source. PKS only needs the NSXTManagerID"
     }
 
-
     # Check if the switch type is provided, when adding a Cisco of Dell switch
     if ($DataSourceType -eq "ciscoswitch" -And $PSCmdlet.ParameterSetName -ne "CISCOSWITCH") {
       throw "Please provide the -CiscoSwitchType parameter when adding a Cisco switch."
@@ -1310,6 +1314,10 @@ function New-vRNIDataSource {
     }
     if ($DataSourceType -eq "aws" -And $PSCmdlet.ParameterSetName -ne "AWS") {
       throw "Please provide the AccessKey and SecretKey parameters when adding an AWS account. Optionally, provide the AddLinkedAccounts with RoleARNSuffix, RestrictToRegions, and FlowsEnabled parameters."
+    }
+
+    if ($PSBoundParameters.ContainsKey('PollingIntervalMinutes') -And $Script:vRNI_API_Version -lt [System.Version]"1.2.0") {
+      throw "Custom polling intervals only work with vRNI 6.3+"
     }
 
     # Format request with all given data
@@ -1408,6 +1416,20 @@ function New-vRNIDataSource {
       else {
         $requestFormat.enable_aws_geo_restrictions = $False
       }
+    }
+
+    # Check if polling interval is giving between 10 and 10080 (7 days)
+    if ($PollingIntervalMinutes -lt 10) {
+      throw "PollingIntervalMinutes needs to be at least 10 minutes"
+    }
+    if ($PollingIntervalMinutes -gt (7 * 24 * 60)) {
+      throw "PollingIntervalMinutes can be at maximum 7 days, or 10080 minutes"
+    }
+
+    # Only provide custom polling interval when it's different than 10 (default)
+    if ($PollingIntervalMinutes -ne 10) {
+      $requestFormat.config_polling_interval_in_min = $PollingIntervalMinutes
+      $requestFormat.config_polling_interval_type = "CUSTOM"
     }
 
     # Convert the hash to JSON, form the URI and send the request to vRNI
@@ -1514,6 +1536,11 @@ function Update-vRNIDataSource {
     [ValidateNotNullOrEmpty()]
     [string]$Notes = "",
 
+    [Parameter (Mandatory = $false)]
+    # Optional polling interval in minutes. Not applicable to all data sources (mostly network devices)
+    [ValidateNotNullOrEmpty()]
+    [int]$PollingIntervalMinutes = 10,
+
     [Parameter (Mandatory = $False)]
     # vRNI Connection object
     [ValidateNotNullOrEmpty()]
@@ -1522,12 +1549,20 @@ function Update-vRNIDataSource {
 
   process {
 
-    if ($Nickname -eq "" -And $Username -eq "" -And $Password -eq "" -And $Notes -eq "") {
-      throw "Provide at least one parameter to update!"
+    if ($Username -eq "" -Or $Password -eq "") {
+      throw "Credentials are required, please provide both the -Username and -Password parameters"
     }
 
-    if (($Username -ne "" -And $Password -eq "") -Or ($Password -ne "" -And $Username -eq "")) {
-      throw "Provide both the -Username and -Password to update credentials"
+    # Check if polling interval is giving between 10 and 10080 (7 days)
+    if ($PollingIntervalMinutes -lt 10) {
+      throw "PollingIntervalMinutes needs to be at least 10 minutes"
+    }
+    if ($PollingIntervalMinutes -gt (7 * 24 * 60)) {
+      throw "PollingIntervalMinutes can be at maximum 7 days, or 10080 minutes"
+    }
+
+    if ($PSBoundParameters.ContainsKey('PollingIntervalMinutes') -And $Script:vRNI_API_Version -lt [System.Version]"1.2.0") {
+      throw "Custom polling intervals only work with vRNI 6.3+"
     }
 
     $DataSource | Foreach-Object {
@@ -1535,20 +1570,39 @@ function Update-vRNIDataSource {
 
       # All we have to do is to send a PUT request to URI /api/ni/$DataSourceType/$DatasourceId,
       # with the modified options
+
+      $oThisDatasource.credentials = @{}
+      $oThisDatasource.credentials.Add('username', $Username)
+      $oThisDatasource.credentials.Add('password', $Password)
+
       if ($Nickname -ne "") {
         $oThisDatasource.nickname = $Nickname
       }
-      if ($Username -ne "") {
-        $oThisDatasource.credentials = @{}
-        $oThisDatasource.credentials.Add('username', $Username)
-        $oThisDatasource.credentials.Add('password', $Password)
-      }
+
       if ($Notes -ne "") {
-        if ($null -eq $oThisDatasource.notes) {
+        # notes might not be in the returned object, if that's the case, add it as an object member
+        if (!($oThisDatasource.PSobject.Properties.Name -contains "notes")) {
           $oThisDatasource | Add-Member -MemberType NoteProperty -Name 'notes' -Value $Notes
         }
         else {
           $oThisDatasource.notes = $Notes
+        }
+      }
+
+      # Provide custom polling interval only for vRNI 6.3+
+      if ($PSBoundParameters.ContainsKey('PollingIntervalMinutes') -And $Script:vRNI_API_Version -ge [System.Version]"1.2.0") {
+        # config_polling_interval_in_min might not be in the returned object, if that's the case, add it as an object member
+        if (!($oThisDatasource.PSobject.Properties.Name -contains "config_polling_interval_in_min")) {
+          $oThisDatasource | Add-Member -MemberType NoteProperty -Name 'config_polling_interval_in_min' -Value $PollingIntervalMinutes
+        }
+        else {
+          $requestFormat.config_polling_interval_in_min = $PollingIntervalMinutes
+        }
+        if (!($oThisDatasource.PSobject.Properties.Name -contains "config_polling_interval_type")) {
+          $oThisDatasource | Add-Member -MemberType NoteProperty -Name 'config_polling_interval_type' -Value "CUSTOM"
+        }
+        else {
+          $requestFormat.config_polling_interval_type = "CUSTOM"
         }
       }
 
