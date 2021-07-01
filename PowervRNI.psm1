@@ -1157,6 +1157,11 @@ function New-vRNIDataSource {
     [ValidateNotNullOrEmpty()]
     [int]$PollingIntervalMinutes = 10,
 
+    [Parameter (Mandatory = $false)]
+    # Enable vCenter IPFIX only on these Distributed Switches. Format: "dvs-12" for a single VDS or "dvs-1,dvs-2" for a list of VDSs
+    [ValidateNotNullOrEmpty()]
+    [string]$EnableIPFIXonVDS = "",
+
     # These params are only required when adding a NSX Manager as datasource
     [Parameter (Mandatory = $False, ParameterSetName = "NSXDS")]
     # Enable the central CLI collection
@@ -1430,6 +1435,18 @@ function New-vRNIDataSource {
     if ($PollingIntervalMinutes -ne 10) {
       $requestFormat.config_polling_interval_in_min = $PollingIntervalMinutes
       $requestFormat.config_polling_interval_type = "CUSTOM"
+    }
+
+    # Check if the EnableIPFIXonVDS parameter has been given and adjust the body accordingly
+    # todo: maybe add support for disable_for_dvs?
+    if ($EnableIPFIXonVDS -ne "") {
+      if ($Script:vRNI_API_Version -lt [System.Version]"1.2.0") {
+        throw "The EnableIPFIXonVDS only works for vRNI 6.3+"
+      }
+      # feed the DVS list into the enable_for_dvs param
+      $requestFormat.ipfix_request = @{
+        "enable_for_dvs" = $EnableIPFIXonVDS
+      }
     }
 
     # Convert the hash to JSON, form the URI and send the request to vRNI
