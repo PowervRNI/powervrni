@@ -1789,15 +1789,10 @@ function Update-vRNIDataSource {
     [ValidateNotNullOrEmpty()]
     [string]$Nickname = "",
 
-    [Parameter (Mandatory = $false)]
-    # Username to use to login to the datasource
+    [Parameter (Mandatory = $true)]
+    # Credentials to use to login to the datasource
     [ValidateNotNullOrEmpty()]
-    [string]$Username = "",
-
-    [Parameter (Mandatory = $false)]
-    # Password to use to login to the datasource
-    [ValidateNotNullOrEmpty()]
-    [securestring]$Password = "",
+    [pscredential]$Credentials,
 
     [Parameter (Mandatory = $false)]
     # Optional notes for the datasource
@@ -1817,10 +1812,6 @@ function Update-vRNIDataSource {
 
   process {
 
-    if ($Username -eq "" -Or $Password -eq "") {
-      throw "Credentials are required, please provide both the -Username and -Password parameters"
-    }
-
     # Check if polling interval is giving between 10 and 10080 (7 days)
     if ($PollingIntervalMinutes -lt 10) {
       throw "PollingIntervalMinutes needs to be at least 10 minutes"
@@ -1838,11 +1829,9 @@ function Update-vRNIDataSource {
 
       # All we have to do is to send a PUT request to URI /api/ni/$DataSourceType/$DatasourceId,
       # with the modified options
-
       $oThisDatasource.credentials = @{}
-      $oThisDatasource.credentials.Add('username', $Username)
-      $cred = New-Object System.Management.Automation.PSCredential("", $Password)
-      $oThisDatasource.credentials.Add('password', $cred.GetNetworkCredential().Password)
+      $oThisDatasource.credentials.Add('username', $Credentials.Username)
+      $oThisDatasource.credentials.Add('password', $Credentials.GetNetworkCredential().Password)
 
       if ($Nickname -ne "") {
         $oThisDatasource.nickname = $Nickname
