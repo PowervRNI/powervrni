@@ -1,5 +1,17 @@
 ## ChangeLog
 
+### v1.9 - 2021-07-09
+
+@smitmartijn:
+
+- \[new] Add cmdlet Update-vRNIDataSource to update data source details (credentials, nickname, notes)
+- \[new] Add cmdlet Invoke-vRNISearch to run search queries. Example: Invoke-vRNISearch -Query “VM where CPU Count > 2”
+- \[new] Add data source support for: AWS, Mellanox, Cisco ASR/XR, VMware HCX, HPE Switches
+- \[new] Add support for Custom polling intervals
+- \[new] Add support for Enabling IPFIX on vCenter VDS when adding 
+- \[new] Add support for Platform Backup Management. New cmdlets: Get-vRNIBackup, Get-vRNIBackupStatus, Remove-vRNIBackup, Enable-vRNIBackup, Disable-vRNIBackup, Set-vRNIBackup
+- \[new] Add support for License Management. New cmdlets: Get-vRNILicensing, Test-vRNILicensing, Install-vRNILicensing, Remove-vRNILicensing
+
 ### v1.4 - 2018-10-13
 
 @smitmartijn:
