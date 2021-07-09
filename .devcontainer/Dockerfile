@@ -1,4 +1,4 @@
-FROM microsoft/powershell:ubuntu16.04
+FROM mcr.microsoft.com/powershell:ubuntu16.04
 
 # Set working directory so stuff doesn't end up in /
 WORKDIR /root

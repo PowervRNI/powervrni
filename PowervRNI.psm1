@@ -379,22 +379,26 @@ function Connect-vRNIServer {
   if successful.
 
   .EXAMPLE
-  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password secret
+  PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -SecurePassword $mysecpassword
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
   with the given local credentials. Returns the connection object, if successful.
 
   .EXAMPLE
-  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password secret
+  PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -SecurePassword $mysecpassword
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
   with the given LDAP credentials. Returns the connection object, if successful.
 
   .EXAMPLE
-  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -Password secret -UseLocalAuth
+  PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
+  PS C:\> Connect-vRNIServer -Server vrni-platform.lab.local -Username martijn@ld.local -SecurePassword $mysecpassword -UseLocalAuth
   Connect to vRNI Platform VM with the hostname vrni-platform.lab.local
   with the given LOCAL credentials. Returns the connection object, if successful.
 
   .EXAMPLE
-  PS C:\> $MyConnection = Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -Password secret
+  PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
+  PS C:\> $MyConnection = Connect-vRNIServer -Server vrni-platform.lab.local -Username admin@local -SecurePassword $mysecpassword
   PS C:\> Get-vRNIDataSource -Connection $MyConnection
   Connects to vRNI with the given credentials and then uses the returned
   connection object in the next cmdlet to retrieve all datasources from
@@ -412,7 +416,7 @@ function Connect-vRNIServer {
     [Parameter (Mandatory = $false)]
     # Password to use to login to vRNI
     [ValidateNotNullOrEmpty()]
-    [string]$Password,
+    [securestring]$Password,
     [Parameter (Mandatory = $false)]
     #PSCredential object containing NSX API authentication credentials
     [PSCredential]$Credential,
@@ -428,20 +432,20 @@ function Connect-vRNIServer {
 
   # Make sure either -Credential is set, or both -Username and -Password
   if (($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Username")) -Or
-    ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("Password"))) {
-    throw "Specify either -Credential or -Username to authenticate (if using -Username and omitting -Password, a prompt will be given)"
+    ($PsBoundParameters.ContainsKey("Credential") -And $PsBoundParameters.ContainsKey("SecurePassword"))) {
+    throw "Specify either -Credential or -Username to authenticate (if using -Username and omitting -SecurePassword, a prompt will be given)"
   }
 
   # Build cred object for default auth if user specified username/pass
   $connection_credentials = ""
   if ($PsBoundParameters.ContainsKey("Username")) {
     # Is the -Password omitted? Prompt securely
-    if (!$PsBoundParameters.ContainsKey("Password")) {
+    if (!($PsBoundParameters.ContainsKey("Password"))) {
       $connection_credentials = Get-Credential -UserName $Username -Message "vRealize Network Insight Platform Authentication"
     }
     # If the password has been given in cleartext,
     else {
-      $connection_credentials = New-Object System.Management.Automation.PSCredential($Username, $(ConvertTo-SecureString $Password -AsPlainText -Force))
+      $connection_credentials = New-Object System.Management.Automation.PSCredential($Username, $Password)
     }
   }
   # If a credential object was given as a parameter, use that
@@ -600,6 +604,52 @@ function Connect-NIServer {
     # Return the connection
     $connection
   }
+}
+
+function Connect-NIBetaServer {
+  <#
+  .SYNOPSIS
+  Connects to a beta instance of Network Insight Service on the VMware Cloud Services
+  Platform and constructs a connection object.
+
+  .DESCRIPTION
+  This is only to be used for the beta instances of vRNI Cloud. These instances do not
+  have the full CSP integration, so refresh tokens cannot be used. The AuthToken parameter
+  needs to come from the browswer developer tools, after you've logged in manually.
+
+  Look for the POST call to /login-csp and copy the extreme long string that's in the
+  response header Set-Cookie; you're looking for the value of csp-auth-token.
+
+  .EXAMPLE
+  PS C:\> Connect-NIBetaServer -AuthToken 'eyJ0...extremelylongstring..u5hyuA' -BetaURL ndnibeta7.us.api.main.vrni-symphony.com
+  #>
+  param (
+    [Parameter (Mandatory = $true)]
+    # The AuthToken value after logging in
+    [ValidateNotNullOrEmpty()]
+    [string]$AuthToken,
+    [Parameter (Mandatory = $true)]
+    # The hostname/URL of the beta instance
+    [ValidateNotNullOrEmpty()]
+    [string]$BetaURL
+  )
+
+  # Setup a custom object to contain the parameters of the connection, including the URL to the CSP API & Access token
+  $connection = [pscustomObject] @{
+    "Server"          = "$($BetaURL)/ni"
+    "CSPToken"        = $AuthToken
+    ## the expiration of the token; currently (vRNI API v1.0), tokens are valid for five (5) hours
+    "AuthTokenExpiry" = (Get-Date).AddSeconds(5 * 60 * 60).ToLocalTime()
+  }
+
+  # Remember this as the default connection
+  Set-Variable -name defaultvRNIConnection -value $connection -scope Global
+
+  # Retrieve the API version so we can use that in determining if we can use newer API endpoints
+  $Script:vRNI_API_Version = [System.Version]((Get-vRNIAPIVersion).api_version)
+
+  # Return the connection
+  $connection
 }
 
 #####################################################################################################################
@@ -1277,15 +1327,20 @@ function New-vRNIDataSource {
   correlate and display this data in the interfce.
 
   .EXAMPLE
+  PS C:\> $mysecpassword = ConvertTo-
+
+
+  secret -AsPlainText -Force
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
-  PS C:\> New-vRNIDataSource -DataSourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password secret -CollectorVMId $collectorId -Nickname vc.nsx.local
+  PS C:\> New-vRNIDataSource -DataSourceType vcenter -FDQN vc.nsx.local -Username administrator@vsphere.local -Password $mysecpassword -CollectorVMId $collectorId -Nickname vc.nsx.local
 
   First, get the node ID of the collector VM (assuming there's only one), then add a vCenter located at vc.nsx.local to vRNI.
 
   .EXAMPLE
+  PS C:\> $mysecpassword = ConvertTo-SecureString secret -AsPlainText -Force
   PS C:\> $collectorId = (Get-vRNINodes | Where {$_.node_type -eq "PROXY_VM"} | Select -ExpandProperty id)
   PS C:\> $vcId = (Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Select -ExpandProperty entity_id)
-  PS C:\> New-vRNIDataSource -DataSourceType nsxv -FDQN mgr.nsx.local -Username admin -Password secret -Nickname mgr.nsx.local -CollectorVMId $collectorId -Enabled $True -NSXEnableCentralCLI $True -NSXEnableIPFIX $True -NSXvCenterID $vcId
+  PS C:\> New-vRNIDataSource -DataSourceType nsxv -FDQN mgr.nsx.local -Username admin -Password $mysecpassword -Nickname mgr.nsx.local -CollectorVMId $collectorId -Enabled $True -NSXEnableCentralCLI $True -NSXEnableIPFIX $True -NSXvCenterID $vcId
 
   Adds a new NSX Manager as a data source, auto select the collector ID (if you only have one), enable the NSX Central CLI for collecting data, also enable NSX IPFIX for network datastream insight from the point of view of NSX.
 
@@ -1315,7 +1370,7 @@ function New-vRNIDataSource {
     [Parameter (Mandatory = $false)]
     # Password to use to login to the datasource
     [ValidateNotNullOrEmpty()]
-    [string]$Password = "",
+    [securestring]$Password = "",
 
     [Parameter (Mandatory = $false)]
     # The IP address of the datasource
@@ -1541,9 +1596,10 @@ function New-vRNIDataSource {
 
     # For any other data source than a generic (UANI) switch, K8s or OpenShift, use regular credentials
     if ($DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") {
+      $cred = New-Object System.Management.Automation.PSCredential("", $Password)
       $requestFormat.credentials = @{
         "username" = $Username
-        "password" = $Password
+        "password" = $cred.GetNetworkCredential().Password
       }
     }
     else {
@@ -1713,7 +1769,8 @@ function Update-vRNIDataSource {
   This cmdlet updates a datasources in vRNI.
 
   .EXAMPLE
-  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Update-vRNIDataSource -Username admin -Password 'VMware1!'
+  PS C:\> $mysecpassword = ConvertTo-SecureString VMware1! -AsPlainText -Force
+  PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "vc.nsx.local"} | Update-vRNIDataSource -Username admin -Password $mysecpassword
   Updates the credentials of a vCenter datasource with the nickname "vc.nsx.local"
 
   .EXAMPLE
@@ -1740,7 +1797,7 @@ function Update-vRNIDataSource {
     [Parameter (Mandatory = $false)]
     # Password to use to login to the datasource
     [ValidateNotNullOrEmpty()]
-    [string]$Password = "",
+    [securestring]$Password = "",
 
     [Parameter (Mandatory = $false)]
     # Optional notes for the datasource
@@ -1784,7 +1841,8 @@ function Update-vRNIDataSource {
 
       $oThisDatasource.credentials = @{}
       $oThisDatasource.credentials.Add('username', $Username)
-      $oThisDatasource.credentials.Add('password', $Password)
+      $cred = New-Object System.Management.Automation.PSCredential("", $Password)
+      $oThisDatasource.credentials.Add('password', $cred.GetNetworkCredential().Password)
 
       if ($Nickname -ne "") {
         $oThisDatasource.nickname = $Nickname
@@ -2101,7 +2159,9 @@ function Set-vRNIDataSourceSNMPConfig {
   the SNMP configuration of a specific data source.
 
   .EXAMPLE
-  PS C:\> $snmpOptions = @{ "Enabled" = $true; "Username" = "snmpv3user"; "ContextName" = " "; "AuthenticationType" = "MD5";  "AuthenticationPassword" = "ult1m4t3p4ss";  "PrivacyType" = "AES128";  "PrivacyPassword" = "s0pr1v4t3"; }
+  PS C:\> $AuthenticationPassword = ConvertTo-SecureString ult1m4t3p4ss -AsPlainText -Force
+  PS C:\> $PrivacyPassword = ConvertTo-SecureString s0pr1v4t3 -AsPlainText -Force
+  PS C:\> $snmpOptions = @{ "Enabled" = $true; "Username" = "snmpv3user"; "ContextName" = " "; "AuthenticationType" = "MD5";  "AuthenticationPassword" = $AuthenticationPassword;  "PrivacyType" = "AES128";  "PrivacyPassword" = $PrivacyPassword; }
   PS C:\> Get-vRNIDataSource | Where {$_.nickname -eq "Core01"} | Set-vRNIDataSourceSNMPConfig @snmpOptions
   Configures SNMPv3 for a data source named 'Core01'
 
@@ -2146,7 +2206,7 @@ function Set-vRNIDataSourceSNMPConfig {
     [Parameter (Mandatory = $true, ParameterSetName = "SNMPv3")]
     # SNMP v3 Authentication Password
     [ValidateNotNullOrEmpty()]
-    [string]$AuthenticationPassword,
+    [securestring]$AuthenticationPassword,
     [Parameter (Mandatory = $true, ParameterSetName = "SNMPv3")]
     # SNMP v3 Privacy Type
     [ValidateSet ("AES", "DES", "AES128", "AES192", "AES256", "3DES", "NO_PRIV")]
@@ -2154,7 +2214,7 @@ function Set-vRNIDataSourceSNMPConfig {
     [Parameter (Mandatory = $true, ParameterSetName = "SNMPv3")]
     # SNMP v3 Privacy Password
     [ValidateNotNullOrEmpty()]
-    [string]$PrivacyPassword,
+    [securestring]$PrivacyPassword,
 
     [Parameter (Mandatory = $False)]
     # vRNI Connection object
@@ -2191,13 +2251,15 @@ function Set-vRNIDataSourceSNMPConfig {
       # if SNMPv3 parameters are given, build the snmp_3 var
       if ($pscmdlet.ParameterSetName -eq "SNMPv3") {
         $requestFormat.snmp_version = "v3"
+        $Authentication = New-Object System.Management.Automation.PSCredential("", $AuthenticationPassword)
+        $Privacy = New-Object System.Management.Automation.PSCredential("", $PrivacyPassword)
         $requestFormat.config_snmp_3 = @{
           "username"                = $Username
           "context_name"            = $ContextName
           "authentication_type"     = $AuthenticationType
-          "authentication_password" = $AuthenticationPassword
+          "authentication_password" = $Authentication.GetNetworkCredential().Password
           "privacy_type"            = $PrivacyType
-          "privacy_password"        = $PrivacyPassword
+          "privacy_password"        = $Privacy.GetNetworkCredential().Password
         }
       }
 
@@ -4702,7 +4764,8 @@ function Set-vRNIUserPassword {
   allow member to set their own passwords.
 
   .EXAMPLE
-  PS C:\> Set-vRNIUserPassword -Username admin@local -NewPassword 'mynewpassword'
+  PS C:\> $mynewpassword = ConvertTo-SecureString mynewpassword -AsPlainText -Force
+  PS C:\> Set-vRNIUserPassword -Username admin@local -NewPassword $mynewpassword
 
   .EXAMPLE
   PS C:\> Set-vRNIUserPassword -Username admin@local
@@ -4725,7 +4788,7 @@ function Set-vRNIUserPassword {
     [string]$Username,
     [Parameter (Mandatory = $false)]
     # Their new password
-    [string]$NewPassword,
+    [securestring]$NewPassword,
     [Parameter (Mandatory = $false)]
     # PSCredential object containing credentials to update
     [PSCredential]$Credential,
@@ -4750,7 +4813,7 @@ function Set-vRNIUserPassword {
     }
     # If the password has been given in cleartext,
     else {
-      $user_credentials = New-Object System.Management.Automation.PSCredential($Username, $(ConvertTo-SecureString $NewPassword -AsPlainText -Force))
+      $user_credentials = New-Object System.Management.Automation.PSCredential($Username, $NewPassword)
     }
   }
   # If a credential object was given as a parameter, use that
@@ -4825,7 +4888,8 @@ function New-DynamicParameter {
   <#
   .NOTES
   Credits to jrich523 and ramblingcookiemonster for their initial code and inspiration:
-      https://github.com/RamblingCookieMonster/PowerShell/blob/master/New-DynamicParam.ps1
+      https://github.com/RamblingCookieMonster/PowerShell/blob/
+      /New-DynamicParam.ps1
       http://ramblingcookiemonster.wordpress.com/2014/11/27/quick-hits-credentials-and-dynamic-parameters/
       http://jrich523.wordpress.com/2013/05/30/powershell-simple-way-to-add-dynamic-parameters-to-advanced-function/
 
