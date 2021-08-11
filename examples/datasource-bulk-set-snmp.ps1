@@ -1,12 +1,12 @@
-# PowervRNI Examples - Changing SNMP configs of multiple switch devices
+# PowervRNI Examples
 #
+# Example: Changing SNMP configs of multiple switch devices
+#
+# START Description
 # This script uses an input CSV (example: datasource-bulk-snmp.csv) to configure multiple vRealize Network Insight
 # Data Sources SNMP Values. Modify datasource-bulk-snmp.csv to contain your own data sources and run this script
 # with the param -DatasourcesCSV to your CSV.  Based off Martijn Smit bulk data source import script.
-#
-# Martijn Smit
-# msmit@vmware.com
-# Version 1.0
+# END Description
 
 param (
   [parameter(Mandatory = $true, ValueFromPipeLine = $true, ValueFromPipeLineByPropertyName = $true)]
