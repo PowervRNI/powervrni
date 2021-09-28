@@ -4873,6 +4873,148 @@ function Remove-vRNISettingsUser {
 }
 
 
+#####################################################################################################################
+#####################################################################################################################
+#####################################  Databus Subscriber Management ################################################
+#####################################################################################################################
+#####################################################################################################################
+
+function Get-vRNIDatabusSubscriber {
+  <#
+  .SYNOPSIS
+  Retrieve all or a single databus subscriber from vRealize Network Insight
+
+  .DESCRIPTION
+  The databus feature is a way to stream high volume data from vRNI to any HTTP(s) endpoint. Subscribers are these endpoints,
+  which contain a URL and a subscription type (problems or applications). Currently, alerts (problems) and application changes
+  are supported as the MessageType.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDatabusSubscriber
+  Get all databus subscribers
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDatabusSubscriber | where {$_.message_group -eq "problems"}
+  Get all databus subscribers that are subscribed to alerts
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDatabusSubscriber | where {$_.message_group -eq "applications"}
+  Get all databus subscribers that are subscribed to application updates
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDatabusSubscriber | where {$_.url -eq "http://kn-ps-vrni-databus.vmware-functions.veba.vrni.cmbu.local"}
+  Get all databus subscribers that used a specific URL
+
+  #>
+  param (
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method "GET" -Uri "/api/ni/settings/databus/subscribers"
+  $result.results
+}
+
+function New-vRNIDatabusSubscriber {
+  <#
+  .SYNOPSIS
+  Create a new databus subscriber to receive streaming data from vRealize Network Insight
+
+  .DESCRIPTION
+  The databus feature is a way to stream high volume data from vRNI to any HTTP(s) endpoint. Subscribers are these endpoints,
+  which contain a URL and a subscription type (problems or applications). Currently, alerts (problems) and application changes
+  are supported as the MessageType.
+
+  NOTE: When using a https URL, make sure the certificate is valid - otherwise vRNI will reject the connection
+
+  .EXAMPLE
+  PS C:\> New-vRNIDatabusSubscriber -MessageGroup problems -URL http://my-subscriber-url.local.corp/alerts
+  Create a new subscriber on problems going towards http://my-subscriber-url.local.corp/alerts
+
+  .EXAMPLE
+  PS C:\> New-vRNIDatabusSubscriber -MessageGroup applications -URL http://my-subscriber-url.local.corp/applications
+  Create a new subscriber on application changes going towards http://my-subscriber-url.local.corp/applications
+  #>
+  param (
+    [Parameter (Mandatory = $true, Position = 1)]
+    [ValidateSet ("problems", "applications")]
+    # The subscriber message group (problems or applications)
+    [string]$MessageGroup,
+    [Parameter (Mandatory = $true, Position = 2)]
+    # The subscriber URL
+    [string]$URL,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = @{
+    "message_group" = $MessageGroup
+    "url"           = $URL
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/databus/subscribers" -Body $requestBody
+
+  $response
+}
+
+function Remove-vRNIDatabusSubscriber {
+  <#
+  .SYNOPSIS
+  Removes a databus subscriber from receiving streaming data from vRealize Network Insight
+
+  .DESCRIPTION
+  The databus feature is a way to stream high volume data from vRNI to any HTTP(s) endpoint. Subscribers are these endpoints,
+  which contain a URL and a subscription type (problems or applications). Currently, alerts (problems) and application changes
+  are supported as the MessageType.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDatabusSubscriber | where {$_.message_group -eq "problems"} | Remove-vRNIDatabusSubscriber
+  Delete all subscribers to the problems message group
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDatabusSubscriber | where {$_.url -eq "http://my-subscriber-url.local.corp/applications"} | Remove-vRNIDatabusSubscriber
+  Delete a specific subscriber with an URL
+  #>
+
+  param (
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Datasource object, gotten from Get-vRNIDatabusSubscriber
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$Subscriber,
+
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  process {
+    $Subscriber | Foreach-Object {
+      $oThisSubscriber = $_
+      # All we have to do is to send a DELETE request to URI /api/ni/settings/databus/subscribers/$SubscriberId, so
+      # form the URI and send the DELETE request to vRNI
+      $URI = "/api/ni/settings/databus/subscribers/$($oThisSubscriber.id)"
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri $URI
+    } ## end Foreach-Object
+  } ## end process
+}
+
+
+
+#####################################################################################################################
+#####################################################################################################################
+###########################################  Other functions ########################################################
+#####################################################################################################################
+#####################################################################################################################
+
 function New-DynamicParameter {
   <#
   .NOTES
