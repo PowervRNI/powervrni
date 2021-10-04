@@ -3129,6 +3129,41 @@ function Get-vRNIKubernetesServices {
   $results
 }
 
+function Get-vRNISDDC {
+  <#
+  .SYNOPSIS
+  Get SDDC objects from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all SDDC constructs in your environment
+  and this cmdlet will help you discover these services.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISDDC
+  List all SDDCs in your vRNI environment (note: this may take a while if you have a lot of SDDCs)
+
+  .EXAMPLE
+  PS C:\> Get-vRNISDDC -Name my-sddc
+  Retrieve only the SDDC object called my-sddc"
+  #>
+  param (
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "vmc-sddc" -Name $Name -Limit $Limit
+  $results
+}
+
 #----------------------------------------------------------------------------------------------------------------#
 #----------------------------------------------------------------------------------------------------------------#
 #-----------------------------------------  VM Entities ---------------------------------------------------------#
