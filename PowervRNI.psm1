@@ -105,6 +105,16 @@ $Script:EntityURLtoIdMapping.Add("distributed-virtual-portgroups", "DistributedV
 $Script:EntityURLtoIdMapping.Add("firewall-managers", "CheckpointManager")
 $Script:EntityURLtoIdMapping.Add("kubernetes-services", "KubernetesService")
 
+
+$Script:vRNICloudLocationUrlMapping = @{ }
+$Script:vRNICloudLocationUrlMapping.Add("default", "api.mgmt.cloud.vmware.com")
+$Script:vRNICloudLocationUrlMapping.Add("US", "api.mgmt.cloud.vmware.com")
+$Script:vRNICloudLocationUrlMapping.Add("UK", "uk.api.mgmt.cloud.vmware.com")
+$Script:vRNICloudLocationUrlMapping.Add("JP", "jp.api.mgmt.cloud.vmware.com")
+$Script:vRNICloudLocationUrlMapping.Add("AU", "au.api.mgmt.cloud.vmware.com")
+$Script:vRNICloudLocationUrlMapping.Add("CA", "ca.api.mgmt.cloud.vmware.com")
+$Script:vRNICloudLocationUrlMapping.Add("DE", "de.api.mgmt.cloud.vmware.com")
+
 # Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing some of the base functions &
 # principles on which this module is built on.
 
@@ -569,16 +579,27 @@ function Connect-NIServer {
   Connect to the VMware Cloud Services Portal with your specified Refresh Token.
   The cmdlet will connect to the CSP, validate the token and will return an
   access token. Returns the connection object, if successful.
+
+  .EXAMPLE
+  PS C:\> Connect-NIServer -RefreshToken xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx -Location UK
+  Connect to the vRealize Network Insight Cloud service in the UK.
   #>
   param (
     [Parameter (Mandatory = $true)]
     # The Refresh Token from your VMware Cloud Services Portal
     [ValidateNotNullOrEmpty()]
-    [string]$RefreshToken
+    [string]$RefreshToken,
+    [Parameter (Mandatory = $false)]
+    # The Refresh Token from your VMware Cloud Services Portal
+    [ValidateNotNullOrEmpty()]
+    [ValidateSet ("default", "US", "UK", "JP", "AU", "CA", "DE")]
+    [string]$Location = "default"
   )
 
   # Only use TLS as SSL connection to vRNI
   [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
+
+  $vrni_cloud_url = $Script:vRNICloudLocationUrlMapping.$Location
 
   $URL = "https://console.cloud.vmware.com/csp/gateway/am/api/auth/api-tokens/authorize?refresh_token=$($RefreshToken)"
   $response = Invoke-WebRequest -URI $URL -ContentType "application/json" -Method POST -UseBasicParsing -Headers @{"csp-auth-token" = "$($RefreshToken)" }
@@ -589,7 +610,7 @@ function Connect-NIServer {
 
     # Setup a custom object to contain the parameters of the connection, including the URL to the CSP API & Access token
     $connection = [pscustomObject] @{
-      "Server"          = "api.mgmt.cloud.vmware.com/ni"
+      "Server"          = "$($vrni_cloud_url)/ni"
       "CSPToken"        = $response.access_token
       ## the expiration of the token; currently (vRNI API v1.0), tokens are valid for five (5) hours
       "AuthTokenExpiry" = (Get-Date).AddSeconds($response.expires_in).ToLocalTime()
