@@ -1456,7 +1456,7 @@ function New-vRNIDataSource {
     # This params is only required when adding a cisco switch
     [Parameter (Mandatory = $true, ParameterSetName = "CISCOSWITCH")]
     # Set the switch type
-    [ValidateSet ("CATALYST_3000", "CATALYST_4500", "CATALYST_6500", "NEXUS_5K", "NEXUS_7K", "NEXUS_9K")]
+    [ValidateSet ("CATALYST_3000", "CATALYST_4500", "CATALYST_6500", "NEXUS_5K", "NEXUS_7K", "NEXUS_9K", "CISCOASRISR", "CISCOASR1000", "CISCOISR4000")]
     [string]$CiscoSwitchType,
 
     # This params is only required when adding a dell switch
