@@ -1,7 +1,7 @@
 # VMware vRealize Network Insight PowerShell module
 # Martijn Smit (@smitmartijn)
 # msmit@vmware.com
-# Version 1.9
+# Version 2.0
 
 
 # Keep a list handy of all data source types and the different URIs that is supposed to be called for that datasource
@@ -104,6 +104,16 @@ $Script:EntityURLtoIdMapping.Add("distributed-virtual-switches", "DistributedVir
 $Script:EntityURLtoIdMapping.Add("distributed-virtual-portgroups", "DistributedVirtualPortgroup")
 $Script:EntityURLtoIdMapping.Add("firewall-managers", "CheckpointManager")
 $Script:EntityURLtoIdMapping.Add("kubernetes-services", "KubernetesService")
+
+
+$Script:vRNICloudLocationUrlMapping = @{ }
+$Script:vRNICloudLocationUrlMapping.Add("default", "api.mgmt.cloud.vmware.com")
+$Script:vRNICloudLocationUrlMapping.Add("US", "api.mgmt.cloud.vmware.com")
+$Script:vRNICloudLocationUrlMapping.Add("UK", "uk.api.mgmt.cloud.vmware.com")
+$Script:vRNICloudLocationUrlMapping.Add("JP", "jp.api.mgmt.cloud.vmware.com")
+$Script:vRNICloudLocationUrlMapping.Add("AU", "au.api.mgmt.cloud.vmware.com")
+$Script:vRNICloudLocationUrlMapping.Add("CA", "ca.api.mgmt.cloud.vmware.com")
+$Script:vRNICloudLocationUrlMapping.Add("DE", "de.api.mgmt.cloud.vmware.com")
 
 # Thanks to PowerNSX (http://github.com/vmware/powernsx) for providing some of the base functions &
 # principles on which this module is built on.
@@ -569,16 +579,27 @@ function Connect-NIServer {
   Connect to the VMware Cloud Services Portal with your specified Refresh Token.
   The cmdlet will connect to the CSP, validate the token and will return an
   access token. Returns the connection object, if successful.
+
+  .EXAMPLE
+  PS C:\> Connect-NIServer -RefreshToken xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx -Location UK
+  Connect to the vRealize Network Insight Cloud service in the UK.
   #>
   param (
     [Parameter (Mandatory = $true)]
     # The Refresh Token from your VMware Cloud Services Portal
     [ValidateNotNullOrEmpty()]
-    [string]$RefreshToken
+    [string]$RefreshToken,
+    [Parameter (Mandatory = $false)]
+    # The Refresh Token from your VMware Cloud Services Portal
+    [ValidateNotNullOrEmpty()]
+    [ValidateSet ("default", "US", "UK", "JP", "AU", "CA", "DE")]
+    [string]$Location = "default"
   )
 
   # Only use TLS as SSL connection to vRNI
   [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
+
+  $vrni_cloud_url = $Script:vRNICloudLocationUrlMapping.$Location
 
   $URL = "https://console.cloud.vmware.com/csp/gateway/am/api/auth/api-tokens/authorize?refresh_token=$($RefreshToken)"
   $response = Invoke-WebRequest -URI $URL -ContentType "application/json" -Method POST -UseBasicParsing -Headers @{"csp-auth-token" = "$($RefreshToken)" }
@@ -589,7 +610,7 @@ function Connect-NIServer {
 
     # Setup a custom object to contain the parameters of the connection, including the URL to the CSP API & Access token
     $connection = [pscustomObject] @{
-      "Server"          = "api.mgmt.cloud.vmware.com/ni"
+      "Server"          = "$($vrni_cloud_url)/ni"
       "CSPToken"        = $response.access_token
       ## the expiration of the token; currently (vRNI API v1.0), tokens are valid for five (5) hours
       "AuthTokenExpiry" = (Get-Date).AddSeconds($response.expires_in).ToLocalTime()
@@ -1435,7 +1456,7 @@ function New-vRNIDataSource {
     # This params is only required when adding a cisco switch
     [Parameter (Mandatory = $true, ParameterSetName = "CISCOSWITCH")]
     # Set the switch type
-    [ValidateSet ("CATALYST_3000", "CATALYST_4500", "CATALYST_6500", "NEXUS_5K", "NEXUS_7K", "NEXUS_9K")]
+    [ValidateSet ("CATALYST_3000", "CATALYST_4500", "CATALYST_6500", "NEXUS_5K", "NEXUS_7K", "NEXUS_9K", "CISCOASRISR", "CISCOASR1000", "CISCOISR4000")]
     [string]$CiscoSwitchType,
 
     # This params is only required when adding a dell switch
@@ -3105,6 +3126,41 @@ function Get-vRNIKubernetesServices {
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
   $results = Get-vRNIEntity -Entity_URI "kubernetes-services" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNISDDC {
+  <#
+  .SYNOPSIS
+  Get SDDC objects from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all SDDC constructs in your environment
+  and this cmdlet will help you discover these services.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISDDC
+  List all SDDCs in your vRNI environment (note: this may take a while if you have a lot of SDDCs)
+
+  .EXAMPLE
+  PS C:\> Get-vRNISDDC -Name my-sddc
+  Retrieve only the SDDC object called my-sddc"
+  #>
+  param (
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "vmc-sddc" -Name $Name -Limit $Limit
   $results
 }
 
@@ -4872,6 +4928,148 @@ function Remove-vRNISettingsUser {
   } ## end process
 }
 
+
+#####################################################################################################################
+#####################################################################################################################
+#####################################  Databus Subscriber Management ################################################
+#####################################################################################################################
+#####################################################################################################################
+
+function Get-vRNIDatabusSubscriber {
+  <#
+  .SYNOPSIS
+  Retrieve all or a single databus subscriber from vRealize Network Insight
+
+  .DESCRIPTION
+  The databus feature is a way to stream high volume data from vRNI to any HTTP(s) endpoint. Subscribers are these endpoints,
+  which contain a URL and a subscription type (problems or applications). Currently, alerts (problems) and application changes
+  are supported as the MessageType.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDatabusSubscriber
+  Get all databus subscribers
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDatabusSubscriber | where {$_.message_group -eq "problems"}
+  Get all databus subscribers that are subscribed to alerts
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDatabusSubscriber | where {$_.message_group -eq "applications"}
+  Get all databus subscribers that are subscribed to application updates
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDatabusSubscriber | where {$_.url -eq "http://kn-ps-vrni-databus.vmware-functions.veba.vrni.cmbu.local"}
+  Get all databus subscribers that used a specific URL
+
+  #>
+  param (
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method "GET" -Uri "/api/ni/settings/databus/subscribers"
+  $result.results
+}
+
+function New-vRNIDatabusSubscriber {
+  <#
+  .SYNOPSIS
+  Create a new databus subscriber to receive streaming data from vRealize Network Insight
+
+  .DESCRIPTION
+  The databus feature is a way to stream high volume data from vRNI to any HTTP(s) endpoint. Subscribers are these endpoints,
+  which contain a URL and a subscription type (problems or applications). Currently, alerts (problems) and application changes
+  are supported as the MessageType.
+
+  NOTE: When using a https URL, make sure the certificate is valid - otherwise vRNI will reject the connection
+
+  .EXAMPLE
+  PS C:\> New-vRNIDatabusSubscriber -MessageGroup problems -URL http://my-subscriber-url.local.corp/alerts
+  Create a new subscriber on problems going towards http://my-subscriber-url.local.corp/alerts
+
+  .EXAMPLE
+  PS C:\> New-vRNIDatabusSubscriber -MessageGroup applications -URL http://my-subscriber-url.local.corp/applications
+  Create a new subscriber on application changes going towards http://my-subscriber-url.local.corp/applications
+  #>
+  param (
+    [Parameter (Mandatory = $true, Position = 1)]
+    [ValidateSet ("problems", "applications")]
+    # The subscriber message group (problems or applications)
+    [string]$MessageGroup,
+    [Parameter (Mandatory = $true, Position = 2)]
+    # The subscriber URL
+    [string]$URL,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Format request with all given data
+  $requestFormat = @{
+    "message_group" = $MessageGroup
+    "url"           = $URL
+  }
+
+  # Convert the hash to JSON, form the URI and send the request to vRNI
+  $requestBody = ConvertTo-Json $requestFormat
+  $response = Invoke-vRNIRestMethod -Connection $Connection -Method POST -Uri "/api/ni/settings/databus/subscribers" -Body $requestBody
+
+  $response
+}
+
+function Remove-vRNIDatabusSubscriber {
+  <#
+  .SYNOPSIS
+  Removes a databus subscriber from receiving streaming data from vRealize Network Insight
+
+  .DESCRIPTION
+  The databus feature is a way to stream high volume data from vRNI to any HTTP(s) endpoint. Subscribers are these endpoints,
+  which contain a URL and a subscription type (problems or applications). Currently, alerts (problems) and application changes
+  are supported as the MessageType.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDatabusSubscriber | where {$_.message_group -eq "problems"} | Remove-vRNIDatabusSubscriber
+  Delete all subscribers to the problems message group
+
+  .EXAMPLE
+  PS C:\> Get-vRNIDatabusSubscriber | where {$_.url -eq "http://my-subscriber-url.local.corp/applications"} | Remove-vRNIDatabusSubscriber
+  Delete a specific subscriber with an URL
+  #>
+
+  param (
+    [Parameter (Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+    # Datasource object, gotten from Get-vRNIDatabusSubscriber
+    [ValidateNotNullOrEmpty()]
+    [PSObject]$Subscriber,
+
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  process {
+    $Subscriber | Foreach-Object {
+      $oThisSubscriber = $_
+      # All we have to do is to send a DELETE request to URI /api/ni/settings/databus/subscribers/$SubscriberId, so
+      # form the URI and send the DELETE request to vRNI
+      $URI = "/api/ni/settings/databus/subscribers/$($oThisSubscriber.id)"
+
+      Invoke-vRNIRestMethod -Connection $Connection -Method DELETE -Uri $URI
+    } ## end Foreach-Object
+  } ## end process
+}
+
+
+
+#####################################################################################################################
+#####################################################################################################################
+###########################################  Other functions ########################################################
+#####################################################################################################################
+#####################################################################################################################
 
 function New-DynamicParameter {
   <#

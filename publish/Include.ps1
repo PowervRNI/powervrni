@@ -7,7 +7,7 @@
 
 # This is the version of PowervRNI. The publish script will also append ".build number",
 # put this in a "major.minor" format
-$PowervRNI_Version = "1.9"
+$PowervRNI_Version = "2.0"
 
 $FunctionsToExport = @(
   'Connect-vRNIServer',
@@ -46,6 +46,7 @@ $FunctionsToExport = @(
   'Get-vRNIVM',
   'Get-vRNIVMvNIC',
   'Get-vRNIDataSourceSNMPConfig',
+  'Get-vRNISDDC',
   'Invoke-vRNIRestMethod',
   'New-vRNIApplication',
   'New-vRNIApplicationTier',
@@ -87,8 +88,10 @@ $FunctionsToExport = @(
   'Remove-vRNIBackup',
   'Enable-vRNIBackup',
   'Disable-vRNIBackup',
-  'Set-vRNIBackup'
-
+  'Set-vRNIBackup',
+  'Get-vRNIDatabusSubscriber',
+  'New-vRNIDatabusSubscriber',
+  'Remove-vRNIDatabusSubscriber'
 )
 
 # Manifest settings
