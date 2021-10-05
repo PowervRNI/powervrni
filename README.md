@@ -35,19 +35,30 @@ PS C:\> Import-Module .\PowervRNI.psd1
 
 A more elaborate usage guide will follow, but here's a quick example on how to get started.
 
-### Connection to the vRNI Platform VM
+### Connecting to the vRNI Platform VM
 
 The API of vRNI requires you to login to the Platform VM first. Here's how:
 
 ```
-PS C:\> Connect-vRNIServer -Server vrni-platform.lab -Username admin@local -Password VMware1!
+PS C:\> $creds = Get-Credential
+PS C:\> Connect-vRNIServer -Server vrni-platform.lab -Credential $creds
 ```
 
-or, if you'd like the system to ask you for your credentials (and not pass them in cleartext)
+or, if you'd like the system to ask you for your credentials
 
 ```
 PS C:\> Connect-vRNIServer -Server vrni-platform.lab
 ```
+
+### Connecting to vRNI Cloud
+
+If you're using vRNI Cloud, use `Connect-NIServer` to authenticate. First, generate a [CSP Refresh Token](https://docs.vmware.com/en/VMware-Cloud-services/services/Using-VMware-Cloud-Services/GUID-E2A3B1C1-E9AD-4B00-A6B6-88D31FCDDF7C.html).
+
+```
+PS C:\> Connect-NIServer -RefreshToken xxx-xxx-xxx-xxx -Location UK
+```
+
+Use the `-Location` parameter to indicate where the vRNI Cloud service is hosted. A list of regions can be found using `Get-Help Connect-NIServer -Examples`
 
 ### Getting Started
 
