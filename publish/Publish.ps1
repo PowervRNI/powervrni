@@ -8,9 +8,9 @@
 # Version 1.0
 
 param (
-    # Required API key to upload to PowerShell Gallery.
-    [Parameter (Mandatory=$true)]
-    [string]$NuGetApiKey
+  # Required API key to upload to PowerShell Gallery.
+  [Parameter (Mandatory = $true)]
+  [string]$NuGetApiKey
 )
 
 # Source the Include.ps1 file for settings
@@ -20,8 +20,8 @@ param (
 # The build number is correlated on how many commits there are.
 
 # Check if we have git
-try {  if(Get-Command git) { <# we have git, so continue! #> } }
-catch {  throw "For this script to run, we need git. I couldn't find git." }
+try { if (Get-Command git) { <# we have git, so continue! #> } }
+catch { throw "For this script to run, we need git. I couldn't find git." }
 
 # Get build number
 $BuildNumber = (git log --oneline).Count
@@ -29,7 +29,7 @@ $BuildNumber = (git log --oneline).Count
 $PowervRNI_Version = $PowervRNI_Version + '.' + $BuildNumber.ToString().Trim()
 # Test version
 if (-not ($PowervRNI_Version -as [version])) {
-    throw "$PowervRNI_Version is not a valid version number. Try again."
+  throw "$PowervRNI_Version is not a valid version number. Try again."
 }
 # Add the version to the manifest options
 $Manifest_Common.Add("ModuleVersion", $PowervRNI_Version)
@@ -48,6 +48,6 @@ Copy-Item -Path "$currentPath/../PowervRNI.psm1" "$currentPath/psgallery/PowervR
 # Copy manifest file to publish directory
 Copy-Item -Path "$currentPath/../PowervRNI.psd1" "$currentPath/psgallery/PowervRNI/"
 
-Publish-Module -NuGetApiKey $NuGetApiKey -Path "$currentPath/psgallery/PowervRNI" -ReleaseNotes "Change Log can be found here: https://github.com/PowervRNI/powervrni/blob/master/ChangeLog.md"
+Publish-Module -NuGetApiKey $NuGetApiKey -Path "$currentPath/psgallery/PowervRNI" -ReleaseNotes $Manifest_Common.ReleaseNotes
 
 Write-Host -ForegroundColor Yellow "PowervRNI $PowervRNI_Version is now published to the PowerShell Gallery! Also push the new files to GitHub."

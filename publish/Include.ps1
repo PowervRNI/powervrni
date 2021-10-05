@@ -109,5 +109,11 @@ $Manifest_Common = @{
   AliasesToExport        = '*'
   LicenseUri             = 'https://github.com/PowervRNI/powervrni/blob/master/LICENSE.md'
   ProjectUri             = 'https://github.com/PowervRNI/powervrni'
-
+  ReleaseNotes           = '### v2.0 - 2021-10-05
+  - \[new] Connect-NIServer: Add support for vRNI Cloud locations by adding the -Location parameter
+  - \[new] New-vRNIDataSource: Add support for Cisco ASR and ISR models (types: CISCOASRISR, CISCOASR1000, CISCOISR4000)
+  - \[new] Get-vRNISDDC: New cmdlet to retrieve SDDC objects
+  - \[new] Get-vRNIDatabusSubscriber: New cmdlet to retrieve all databus subscribers
+  - \[new] New-vRNIDatabusSubscriber: New cmdlet to create a databus subscriber
+  - \[new] Remove-vRNIDatabusSubscriber: New cmdlet to remove a databus subscriber'
 }
