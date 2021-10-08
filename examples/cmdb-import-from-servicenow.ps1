@@ -104,7 +104,7 @@ function get_children($outbound_relations, $depth) {
 
 # Connect PowervRNI
 Write-Host "Connecting PowervRNI to Network Insight.."
-$conn = Connect-vRNIServer -Server $CONFIG_vRNI_SERVER -User $CONFIG_vRNI_USER -Password $CONFIG_vRNI_PASS
+$conn = Connect-vRNIServer -Server $CONFIG_vRNI_SERVER -User $CONFIG_vRNI_USER -Password ($CONFIG_VRNI_PASS | ConvertTo-SecureString -AsPlainText -Force)
 if (!$conn) {
   throw "Connection to Network Insight failed! Stopping."
 }

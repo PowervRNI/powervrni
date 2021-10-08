@@ -42,7 +42,7 @@ foreach ($csvLine in $csvList) {
   $cmdParams = @{
     "DataSourceType" = $csvLine.DatasourceType;
     "Username"       = $csvLine.Username;
-    "Password"       = $csvLine.Password;
+    "Password"       = ($csvLine.Password | ConvertTo-SecureString -AsPlainText -Force);
     "IP"             = $csvLine.IP;
     "Nickname"       = $csvLine.Nickname;
     "CollectorVMId"  = $collectorId;

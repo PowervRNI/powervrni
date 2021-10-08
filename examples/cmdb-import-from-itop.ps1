@@ -17,8 +17,7 @@ $CONFIG_VRNI_HOST = "network-insight.platform.lab"
 $CONFIG_VRNI_USER = "admin@local"
 $CONFIG_VRNI_PASS = "VMware1!"
 
-
-$vrni_connection = Connect-vRNIServer -Server $CONFIG_VRNI_HOST -User $CONFIG_VRNI_USER -Password $CONFIG_VRNI_PASS
+$vrni_connection = Connect-vRNIServer -Server $CONFIG_VRNI_HOST -User $CONFIG_VRNI_USER -Password ($CONFIG_VRNI_PASS | ConvertTo-SecureString -AsPlainText -Force)
 Write-Host -ForegroundColor 'Green' "Connected to Network Insight with PowervRNI!"
 Write-Host "Connecting to CMDB to get a list of applications..."
 
