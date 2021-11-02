@@ -1617,7 +1617,7 @@ function New-vRNIDataSource {
 
     # For any other data source than a generic (UANI) switch, K8s or OpenShift, use regular credentials
     if ($DataSourceType -ne "kubernetes" -And $DataSourceType -ne "openshift" -And $DataSourceType -ne "generic-device") {
-      $cred = New-Object System.Management.Automation.PSCredential("", $Password)
+      $cred = New-Object System.Management.Automation.PSCredential($Username, $Password)
       $requestFormat.credentials = @{
         "username" = $Username
         "password" = $cred.GetNetworkCredential().Password
@@ -2261,8 +2261,8 @@ function Set-vRNIDataSourceSNMPConfig {
       # if SNMPv3 parameters are given, build the snmp_3 var
       if ($pscmdlet.ParameterSetName -eq "SNMPv3") {
         $requestFormat.snmp_version = "v3"
-        $Authentication = New-Object System.Management.Automation.PSCredential("", $AuthenticationPassword)
-        $Privacy = New-Object System.Management.Automation.PSCredential("", $PrivacyPassword)
+        $Authentication = New-Object System.Management.Automation.PSCredential($Username, $AuthenticationPassword)
+        $Privacy = New-Object System.Management.Automation.PSCredential($Username, $PrivacyPassword)
         $requestFormat.config_snmp_3 = @{
           "username"                = $Username
           "context_name"            = $ContextName
