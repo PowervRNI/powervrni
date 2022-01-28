@@ -9,6 +9,7 @@ $Script:DatasourceURLs = @{ }
 $Script:DatasourceURLs.Add("vcenter", @("/data-sources/vcenters"))
 $Script:DatasourceURLs.Add("nsxv", @("/data-sources/nsxv-managers"))
 $Script:DatasourceURLs.Add("nsxt", @("/data-sources/nsxt-managers"))
+$Script:DatasourceURLs.Add("nsxalb", @("/data-sources/nsxalb"))
 $Script:DatasourceURLs.Add("ciscoswitch", @("/data-sources/cisco-switches"))
 $Script:DatasourceURLs.Add("aristaswitch", @("/data-sources/arista-switches"))
 $Script:DatasourceURLs.Add("dellswitch", @("/data-sources/dell-switches"))
@@ -51,6 +52,7 @@ $Script:DatasourceInternalURLs = @{ }
 $Script:DatasourceInternalURLs.Add("VCenterDataSource", "/data-sources/vcenters")
 $Script:DatasourceInternalURLs.Add("NSXVManagerDataSource", "/data-sources/nsxv-managers")
 $Script:DatasourceInternalURLs.Add("NSXTManagerDataSource", "/data-sources/nsxt-managers")
+$Script:DatasourceInternalURLs.Add("NSXALBDataSource", "/data-sources/nsxalb")
 $Script:DatasourceInternalURLs.Add("CiscoSwitchDataSource", "/data-sources/cisco-switches")
 $Script:DatasourceInternalURLs.Add("AristaSwitchDataSource", "/data-sources/arista-switches")
 $Script:DatasourceInternalURLs.Add("DellSwitchDataSource", "/data-sources/dell-switches")
@@ -104,7 +106,14 @@ $Script:EntityURLtoIdMapping.Add("distributed-virtual-switches", "DistributedVir
 $Script:EntityURLtoIdMapping.Add("distributed-virtual-portgroups", "DistributedVirtualPortgroup")
 $Script:EntityURLtoIdMapping.Add("firewall-managers", "CheckpointManager")
 $Script:EntityURLtoIdMapping.Add("kubernetes-services", "KubernetesService")
-
+$Script:EntityURLtoIdMapping.Add("direct-connect", "VmcAWSDxConnection")
+$Script:EntityURLtoIdMapping.Add("dx-tunnels", "DirectConnectInterface")
+$Script:EntityURLtoIdMapping.Add("logical-routers", "LogicalRouter")
+$Script:EntityURLtoIdMapping.Add("vmware-transit-gateways", "VMWareTransitGateway")
+$Script:EntityURLtoIdMapping.Add("ipsec-vpn-sessions", "PolicyManagerPolicyBasedIPSecVPNSession")
+$Script:EntityURLtoIdMapping.Add("sddc-groups", "VMCSDDCGROUP")
+$Script:EntityURLtoIdMapping.Add("vmc-sddc", "VMCSDDC")
+$Script:EntityURLtoIdMapping.Add("switchports", "SwitchPort")
 
 $Script:vRNICloudLocationUrlMapping = @{ }
 $Script:vRNICloudLocationUrlMapping.Add("default", "api.mgmt.cloud.vmware.com")
@@ -3164,6 +3173,108 @@ function Get-vRNISDDC {
   $results
 }
 
+function Get-vRNISDDCGroup {
+  <#
+  .SYNOPSIS
+  Get SDDC Group objects from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all SDDC Group constructs in your environment
+  and this cmdlet will help you discover these services.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISDDCGroup
+  List all SDDC Groups in your vRNI environment (note: this may take a while if you have a lot of SDDC Groups)
+
+  .EXAMPLE
+  PS C:\> Get-vRNISDDCGroup -Name my-sddc-group
+  Retrieve only the SDDC Group object called my-sddc-group"
+  #>
+  param (
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "sddc-groups" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNIVMCDirectConnect {
+  <#
+  .SYNOPSIS
+  Get VMC Direct Connect objects from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all VMC Direct Connects in your environment
+  and this cmdlet will help you discover these services.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIVMCDirectConnect
+  List all VMC Direct Connects in your vRNI environment (note: this may take a while if you have a lot of SDDCs)
+
+  .EXAMPLE
+  PS C:\> Get-vRNIVMCDirectConnect -Name "7224-10.73.185.131"
+  List a specific VMC Direct Connect
+  #>
+  param (
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Search for a specific name
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "direct-connect" -Name $Name -Limit $Limit
+  $results
+}
+
+
+function Get-vRNIVMCDirectConnectInterface {
+  <#
+  .SYNOPSIS
+  Get VMC Direct Connect Interface objects from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all VMC Direct Connect Interfaces in your environment
+  and this cmdlet will help you discover these interfaces.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIVMCDirectConnectInterface
+  List all VMC Direct Connect Interfaces in your vRNI environment (note: this may take a while if you have a lot of SDDCs)
+  #>
+  param (
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Search for a specific name
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "dx-tunnels" -Name $Name -Limit $Limit
+  $results
+}
+
 #----------------------------------------------------------------------------------------------------------------#
 #----------------------------------------------------------------------------------------------------------------#
 #-----------------------------------------  VM Entities ---------------------------------------------------------#
@@ -3797,6 +3908,49 @@ function Get-vRNIDistributedSwitchPortGroup {
   $results
 }
 
+function Get-vRNISwitchPort {
+  <#
+  .SYNOPSIS
+  Get available switch ports from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all switch ports in your environment
+  and this cmdlet will help you discover these switch ports.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISwitchPort
+  Get all switch ports in the vRNI environment.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISwitchPort | where {$_.administrativeStatus -eq "DOWN"}
+  Get all switch ports that are administratively disabled
+
+  .EXAMPLE
+  PS C:\> Get-vRNISwitchPort | where {$_.administrativeStatus -eq "UP"} | where {$_.operationalStatus -eq "DOWN"}
+  Get all switch ports that are supposed to be up, but are operationally down
+
+  .EXAMPLE
+  PS C:\> Get-vRNISwitchPort -Name "Ethernet0/1"
+  Get only the switch port called 'Ethernet0/1'
+  #>
+  param (
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "switchports" -Name $Name -Limit $Limit
+  $results
+}
+
 function Get-vRNICheckPointManagers {
   <#
   .SYNOPSIS
@@ -3829,6 +3983,116 @@ function Get-vRNICheckPointManagers {
 
   # Call Get-vRNIEntity with the proper URI to get the entity results
   $results = Get-vRNIEntity -Entity_URI "firewall-managers" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNILogicalRouter {
+  <#
+  .SYNOPSIS
+  Get available Logical Routers from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all Logical Routers in your environment
+  and this cmdlet will help you discover these Logical Routers. LRs consist out of:
+  VRFs in routers, load balancers, firewall, etc. & NSX-T T0 & T1 routers.
+
+  .EXAMPLE
+  PS C:\> Get-vRNILogicalRouter
+  Get all Logical Routers in the vRNI environment.
+
+  .EXAMPLE
+  PS C:\> Get-vRNILogicalRouter -Name LabSwitch
+  Get only the VDS called 'LabSwitch'
+
+  #>
+  param (
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "logical-routers" -Name $Name -Limit $Limit
+  $results
+}
+
+function Get-vRNIVMwareTransitGateway {
+  <#
+  .SYNOPSIS
+  Get available VMware Transit Gateways from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all VMware Transit Gateway in your environment
+  and this cmdlet will help you discover these VMware Transit Gateway.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIVMwareTransitGateway
+  Get all VMware Transit Gateways.
+
+  .EXAMPLE
+  PS C:\> Get-vRNIVMwareTransitGateway -Name "tgw-0c457fae19d218c33"
+  Get only the VMware Transit Gateway called 'tgw-0c457fae19d218c33'
+
+  #>
+  param (
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "vmware-transit-gateways" -Name $Name -Limit $Limit
+  $results
+}
+
+
+function Get-vRNINSXTIPsecVPNSessions {
+  <#
+  .SYNOPSIS
+  Get available IPsec VPN sessions via NSX-T from vRealize Network Insight.
+
+  .DESCRIPTION
+  vRealize Network Insight has a database of all IPsec VPN sessions on NSX-T in your environment
+  and this cmdlet will help you discover these IPsec VPN sessions.
+
+  .EXAMPLE
+  PS C:\> Get-vRNINSXTIPsecVPNSessions
+  Get all IPsec VPN sessions.
+
+  .EXAMPLE
+  PS C:\> Get-vRNINSXTIPsecVPNSessions -Name "VMware VPN 1758"
+  Get only the IPsec VPN sessions called 'VMware VPN 1758'
+
+  #>
+  param (
+    [Parameter (Mandatory = $false)]
+    # Limit the amount of records returned
+    [int]$Limit = 0,
+    [Parameter (Mandatory = $false, Position = 1)]
+    # Limit the amount of records returned
+    [string]$Name = "",
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Call Get-vRNIEntity with the proper URI to get the entity results
+  $results = Get-vRNIEntity -Entity_URI "ipsec-vpn-sessions" -Name $Name -Limit $Limit
   $results
 }
 
@@ -4928,6 +5192,112 @@ function Remove-vRNISettingsUser {
   } ## end process
 }
 
+function Get-vRNISettingsLoginBanner {
+  <#
+  .SYNOPSIS
+  Retrieve the configured login banner from Network Insight
+
+  .DESCRIPTION
+  You can configure a login banner and user consent checkbox that's
+  shown upon logging into vRNI. This cmdlet gets the configured values.
+
+  .EXAMPLE
+  PS C:\> Get-vRNISettingsLoginBanner
+
+  #>
+  param (
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method "GET" -Uri "/api/ni/settings/loginBanner"
+  $result
+}
+
+function Set-vRNISettingsLoginBanner {
+  <#
+  .SYNOPSIS
+  Configure the login banner on vRealize Network Insight
+
+  .DESCRIPTION
+  You can configure a login banner and user consent checkbox that's
+  shown upon logging into vRNI. This cmdlet configures that.
+
+  The user consent form (title & message) are required, the login
+  banner is optional.
+
+  .EXAMPLE
+  PS C:\> Set-vRNISettingsLoginBanner -ConsentTitle "our robot overlords" -ConsentMessage "Do you submit to the robot overlords?" -MessageBanner "vRNI maintenance on Saturday!"
+
+  #>
+  param (
+    [Parameter (Mandatory = $true)]
+    # The title that will be displayed for the consent form
+    [ValidateNotNullOrEmpty()]
+    [String]$ConsentTitle,
+    [Parameter (Mandatory = $true)]
+    # The message that will be displayed for the consent form
+    [ValidateNotNullOrEmpty()]
+    [String]$ConsentMessage,
+    [Parameter (Mandatory = $false)]
+    # The login banner that's displayed on the login form (optional)
+    [ValidateNotNullOrEmpty()]
+    [String]$MessageBanner,
+    [Parameter (Mandatory = $false)]
+    # Enabling the login banner and consent form?
+    [ValidateNotNullOrEmpty()]
+    [bool]$Enabled = $True,
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  # Initialise the body
+  $body = @{
+    "is_enabled"               = $Enabled
+    "login_message_banner"     = $MessageBanner
+    "user_consent_title"       = $ConsentTitle
+    "user_consent_description" = $ConsentMessage
+  }
+
+  # Initialise the RestMethod params
+  $listParams = @{
+    Connection = $Connection
+    Method     = 'POST'
+    Uri        = "/api/ni/settings/loginBanner"
+    Body       = $body | ConvertTo-Json
+  }
+
+  $result = Invoke-vRNIRestMethod @listParams
+  $result
+}
+
+function Remove-vRNISettingsLoginBanner {
+  <#
+  .SYNOPSIS
+  Removes the configured login banner from Network Insight
+
+  .DESCRIPTION
+  You can configure a login banner and user consent checkbox that's
+  shown upon logging into vRNI. This cmdlet removes the configured values.
+
+  .EXAMPLE
+  PS C:\> Remove-vRNISettingsLoginBanner
+
+  #>
+  param (
+    [Parameter (Mandatory = $False)]
+    # vRNI Connection object
+    [ValidateNotNullOrEmpty()]
+    [PSCustomObject]$Connection = $defaultvRNIConnection
+  )
+
+  $result = Invoke-vRNIRestMethod -Connection $Connection -Method "DELETE" -Uri "/api/ni/settings/loginBanner"
+  $result
+}
 
 #####################################################################################################################
 #####################################################################################################################
@@ -4995,7 +5365,7 @@ function New-vRNIDatabusSubscriber {
   #>
   param (
     [Parameter (Mandatory = $true, Position = 1)]
-    [ValidateSet ("problems", "applications")]
+    [ValidateSet ("problems", "applications", "flows", "metrics", "vms", "hosts", "nics", "switchports")]
     # The subscriber message group (problems or applications)
     [string]$MessageGroup,
     [Parameter (Mandatory = $true, Position = 2)]
@@ -5009,7 +5379,7 @@ function New-vRNIDatabusSubscriber {
 
   # Format request with all given data
   $requestFormat = @{
-    "message_group" = $MessageGroup
+    "message_group" = $MessageGroup.ToLower()
     "url"           = $URL
   }
 
