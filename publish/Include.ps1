@@ -7,7 +7,7 @@
 
 # This is the version of PowervRNI. The publish script will also append ".build number",
 # put this in a "major.minor" format
-$PowervRNI_Version = "2.0"
+$PowervRNI_Version = "6.5"
 
 $FunctionsToExport = @(
   'Connect-vRNIServer',
@@ -91,7 +91,17 @@ $FunctionsToExport = @(
   'Set-vRNIBackup',
   'Get-vRNIDatabusSubscriber',
   'New-vRNIDatabusSubscriber',
-  'Remove-vRNIDatabusSubscriber'
+  'Remove-vRNIDatabusSubscriber',
+  'Get-vRNISDDCGroup',
+  'Get-vRNIVMCDirectConnect',
+  'Get-vRNIVMCDirectConnectInterface',
+  'Get-vRNISwitchPort',
+  'Get-vRNILogicalRouter',
+  'Get-vRNIVMwareTransitGateway',
+  'Get-vRNINSXTIPsecVPNSessions',
+  'Get-vRNISettingsLoginBanner',
+  'Set-vRNISettingsLoginBanner',
+  'Remove-vRNISettingsLoginBanner'
 )
 
 # Manifest settings
@@ -100,7 +110,7 @@ $Manifest_Common = @{
   GUID                   = 'a34be6be-3dc1-457a-aea3-d4263481ed79'
   Author                 = 'Martijn Smit'
   CompanyName            = 'VMware'
-  Copyright              = 'Copyright 2021 VMware. All rights reserved.'
+  Copyright              = 'Copyright 2022 VMware. All rights reserved.'
   Description            = 'A PowerShell module to talk to the vRealize Network Insight API'
   DotNetFrameworkVersion = '4.0'
   FunctionsToExport      = $FunctionsToExport
@@ -109,11 +119,18 @@ $Manifest_Common = @{
   AliasesToExport        = '*'
   LicenseUri             = 'https://github.com/PowervRNI/powervrni/blob/master/LICENSE.md'
   ProjectUri             = 'https://github.com/PowervRNI/powervrni'
-  ReleaseNotes           = '### v2.0 - 2021-10-05
-  - \[new] Connect-NIServer: Add support for vRNI Cloud locations by adding the -Location parameter
-  - \[new] New-vRNIDataSource: Add support for Cisco ASR and ISR models (types: CISCOASRISR, CISCOASR1000, CISCOISR4000)
-  - \[new] Get-vRNISDDC: New cmdlet to retrieve SDDC objects
-  - \[new] Get-vRNIDatabusSubscriber: New cmdlet to retrieve all databus subscribers
-  - \[new] New-vRNIDatabusSubscriber: New cmdlet to create a databus subscriber
-  - \[new] Remove-vRNIDatabusSubscriber: New cmdlet to remove a databus subscriber'
+  ReleaseNotes           = '### v6.5 - 2022-01-28
+    - \[new] Match PowervRNI version to indicate support for vRNI versions
+    - \[new] Support for NSXALB Data Source (NSX Advanced Load Balancer)
+    - \[new] New message groups for the databus subscriber: flows, metrics, VMs, hosts, NICs, switchports
+    - \[new] Get-vRNISDDCGroup
+    - \[new] Get-vRNIVMCDirectConnect
+    - \[new] Get-vRNIVMCDirectConnectInterface
+    - \[new] Get-vRNISwitchPort
+    - \[new] Get-vRNILogicalRouter
+    - \[new] Get-vRNIVMwareTransitGateway
+    - \[new] Get-vRNINSXTIPsecVPNSessions
+    - \[new] Get-vRNISettingsLoginBanner
+    - \[new] Set-vRNISettingsLoginBanner
+    - \[new] Remove-vRNISettingsLoginBanner'
 }
