@@ -610,9 +610,50 @@ function Connect-NIServer {
 
   $vrni_cloud_url = $Script:vRNICloudLocationUrlMapping.$Location
 
-  $URL = "https://console.cloud.vmware.com/csp/gateway/am/api/auth/api-tokens/authorize?refresh_token=$($RefreshToken)"
-  $response = Invoke-WebRequest -URI $URL -ContentType "application/json" -Method POST -UseBasicParsing -Headers @{"csp-auth-token" = "$($RefreshToken)" }
-  Write-Debug "Response: $($response)"
+  $body = @{
+    api_token = $RefreshToken
+  }
+  $URL = "https://console.cloud.vmware.com/csp/gateway/am/api/auth/api-tokens/authorize"
+
+  # Energize!
+  try {
+    $response = Invoke-WebRequest -URI $URL -Body $body -ContentType "application/x-www-form-urlencoded" -Method POST -UseBasicParsing
+    Write-Debug "Response: $($response)"
+  }
+
+  # If its a webexception, we may have got a response from the server with more information...
+  # Even if this happens on PoSH Core though, the ex is not a webexception and we cant get this info :(
+  catch [System.Net.WebException] {
+    #Check if there is a response populated in the response prop as we can return better detail.
+    $response = $_.exception.response
+    if ( $response ) {
+      $responseStream = $response.GetResponseStream()
+      $reader = New-Object system.io.streamreader($responseStream)
+      $responseBody = $reader.readtoend()
+      ## include ErrorDetails content in case therein lies juicy info
+      $ErrorString = "$($MyInvocation.MyCommand.Name) : The API response received indicates a failure. $($response.StatusCode.value__) : $($response.StatusDescription) : Response Body: $($responseBody)`nErrorDetails: '$($_.ErrorDetails)'"
+
+      # Log the error with response detail.
+      Write-Warning -Message $ErrorString
+      ## throw the actual error, so that the consumer can debug via the actuall ErrorRecord
+      Throw $_
+    }
+    else {
+      # No response, log and throw the underlying ex
+      $ErrorString = "$($MyInvocation.MyCommand.Name) : Exception occured calling invoke-restmethod. $($_.exception.tostring())"
+      Write-Warning -Message $_.exception.tostring()
+      ## throw the actual error, so that the consumer can debug via the actuall ErrorRecord
+      Throw $_
+    }
+  }
+
+  catch {
+    # Not a webexception (may be on PoSH core), log and throw the underlying ex string
+    $ErrorString = "$($MyInvocation.MyCommand.Name) : Exception occured calling invoke-restmethod. $($_.exception.tostring())"
+    Write-Warning -Message $ErrorString
+    ## throw the actual error, so that the consumer can debug via the actuall ErrorRecord
+    Throw $_
+  }
 
   if ($response) {
     $response = ($response | ConvertFrom-Json)
@@ -634,52 +675,6 @@ function Connect-NIServer {
     # Return the connection
     $connection
   }
-}
-
-function Connect-NIBetaServer {
-  <#
-  .SYNOPSIS
-  Connects to a beta instance of Network Insight Service on the VMware Cloud Services
-  Platform and constructs a connection object.
-
-  .DESCRIPTION
-  This is only to be used for the beta instances of vRNI Cloud. These instances do not
-  have the full CSP integration, so refresh tokens cannot be used. The AuthToken parameter
-  needs to come from the browswer developer tools, after you've logged in manually.
-
-  Look for the POST call to /login-csp and copy the extreme long string that's in the
-  response header Set-Cookie; you're looking for the value of csp-auth-token.
-
-  .EXAMPLE
-  PS C:\> Connect-NIBetaServer -AuthToken 'eyJ0...extremelylongstring..u5hyuA' -BetaURL ndnibeta7.us.api.main.vrni-symphony.com
-  #>
-  param (
-    [Parameter (Mandatory = $true)]
-    # The AuthToken value after logging in
-    [ValidateNotNullOrEmpty()]
-    [string]$AuthToken,
-    [Parameter (Mandatory = $true)]
-    # The hostname/URL of the beta instance
-    [ValidateNotNullOrEmpty()]
-    [string]$BetaURL
-  )
-
-  # Setup a custom object to contain the parameters of the connection, including the URL to the CSP API & Access token
-  $connection = [pscustomObject] @{
-    "Server"          = "$($BetaURL)/ni"
-    "CSPToken"        = $AuthToken
-    ## the expiration of the token; currently (vRNI API v1.0), tokens are valid for five (5) hours
-    "AuthTokenExpiry" = (Get-Date).AddSeconds(5 * 60 * 60).ToLocalTime()
-  }
-
-  # Remember this as the default connection
-  Set-Variable -name defaultvRNIConnection -value $connection -scope Global
-
-  # Retrieve the API version so we can use that in determining if we can use newer API endpoints
-  $Script:vRNI_API_Version = [System.Version]((Get-vRNIAPIVersion).api_version)
-
-  # Return the connection
-  $connection
 }
 
 #####################################################################################################################
