@@ -2374,7 +2374,7 @@ function Get-vRNIApplication {
   else {
     # With version 1.1.0 of the API - there's a single endpoint to retrieve all
     if ($Script:vRNI_API_Version -ge [System.Version]"1.1.0") {
-      $listParams['Uri'] = '/api/ni/groups/applications/fetch?size=2500'
+      $listParams['Uri'] = '/api/ni/groups/applications/fetch?size=100'
       $applications = Invoke-vRNIRestMethod @listParams
       $applications.results
       return
