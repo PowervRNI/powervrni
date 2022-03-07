@@ -7,7 +7,7 @@
 
 # This is the version of PowervRNI. The publish script will also append ".build number",
 # put this in a "major.minor" format
-$PowervRNI_Version = "6.5"
+$PowervRNI_Version = "6.5.1"
 
 $FunctionsToExport = @(
   'Connect-vRNIServer',
@@ -119,18 +119,6 @@ $Manifest_Common = @{
   AliasesToExport        = '*'
   LicenseUri             = 'https://github.com/PowervRNI/powervrni/blob/master/LICENSE.md'
   ProjectUri             = 'https://github.com/PowervRNI/powervrni'
-  ReleaseNotes           = '### v6.5 - 2022-01-28
-    - \[new] Match PowervRNI version to indicate support for vRNI versions
-    - \[new] Support for NSXALB Data Source (NSX Advanced Load Balancer)
-    - \[new] New message groups for the databus subscriber: flows, metrics, VMs, hosts, NICs, switchports
-    - \[new] Get-vRNISDDCGroup
-    - \[new] Get-vRNIVMCDirectConnect
-    - \[new] Get-vRNIVMCDirectConnectInterface
-    - \[new] Get-vRNISwitchPort
-    - \[new] Get-vRNILogicalRouter
-    - \[new] Get-vRNIVMwareTransitGateway
-    - \[new] Get-vRNINSXTIPsecVPNSessions
-    - \[new] Get-vRNISettingsLoginBanner
-    - \[new] Set-vRNISettingsLoginBanner
-    - \[new] Remove-vRNISettingsLoginBanner'
+  ReleaseNotes           = '### v6.5.1 - 2022-03-07
+    - \[fixed] Change the application page size to 100 to fix seeing an error about a hard limit in vRNI 6.5.1'
 }
