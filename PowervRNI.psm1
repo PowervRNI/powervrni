@@ -2375,8 +2375,27 @@ function Get-vRNIApplication {
     # With version 1.1.0 of the API - there's a single endpoint to retrieve all
     if ($Script:vRNI_API_Version -ge [System.Version]"1.1.0") {
       $listParams['Uri'] = '/api/ni/groups/applications/fetch?size=100'
-      $applications = Invoke-vRNIRestMethod @listParams
-      $applications.results
+      $applicationResponse = Invoke-vRNIRestMethod @listParams
+      $applications = $applicationResponse.results
+
+      # If total_count is more than the page size, loop until all results are retrieved
+      if ($applicationResponse.total_count -gt 100) {
+        while ($applications.count -lt $applicationResponse.total_count) {
+          # set the cursor for the next run
+          $listParams['Uri'] = "/api/ni/groups/applications/fetch?size=100&cursor=$($applicationResponse.cursor)"
+
+          # retrieve the next chunk of results 
+          $applicationResponse = Invoke-vRNIRestMethod @listParams
+
+          # Add them to the set
+          #
+          # The ArrayList 'Add' method produced weird results here, likely
+          # due to different properties (last_modified_by_service) in only 
+          # a handful of applications. Efficiency could be improved upon.
+          $applications += $applicationResponse.results
+        }
+      }
+      $applications
       return
     }
   }
