@@ -2329,11 +2329,20 @@ function Get-vRNIApplication {
 
   $applications = [System.Collections.ArrayList]@()
 
-  $size = 50
   $listParams = @{
     Connection = $Connection
     Method     = 'GET'
-    Uri        = "/api/ni/groups/applications?size=$size"
+  }  
+
+  # Select endpoint and page size by API version
+  if ($Script:vRNI_API_Version -ge [System.Version]"1.1.0") {
+    $size = 100
+    $listParams['Uri'] = "/api/ni/groups/applications/fetch?size=$size"
+    Write-Verbose ("API version >= 1.1.0, endpoint $($listParams['Uri'])")
+  } else {
+    $size = 50
+    $listParams['Uri'] = "/api/ni/groups/applications?size=$size"
+    Write-Verbose ("API version < 1.1.0, endpoint $($listParams['Uri'])")
   }
 
   # If a filter has been given, use the search endpoint to more efficiently find the right applications
@@ -2371,63 +2380,30 @@ function Get-vRNIApplication {
     $listParams['Body'] = $body | ConvertTo-Json
     Write-Verbose ('Body: ' + $listParams['Body'])
   } ## end if ($PSCmdlet.ParameterSetName -eq 'Filter')
-  else {
-    # With version 1.1.0 of the API - there's a single endpoint to retrieve all
-    if ($Script:vRNI_API_Version -ge [System.Version]"1.1.0") {
-      $listParams['Uri'] = '/api/ni/groups/applications/fetch?size=100'
-      $applicationResponse = Invoke-vRNIRestMethod @listParams
-      $applications = $applicationResponse.results
 
-      # If total_count is more than the page size, loop until all results are retrieved
-      if ($applicationResponse.total_count -gt 100) {
-        while ($applications.count -lt $applicationResponse.total_count) {
-          # set the cursor for the next run
-          $listParams['Uri'] = "/api/ni/groups/applications/fetch?size=100&cursor=$($applicationResponse.cursor)"
-
-          # retrieve the next chunk of results 
-          $applicationResponse = Invoke-vRNIRestMethod @listParams
-
-          # Add them to the set
-          #
-          # The ArrayList 'Add' method produced weird results here, likely
-          # due to different properties (last_modified_by_service) in only 
-          # a handful of applications. Efficiency could be improved upon.
-          $applications += $applicationResponse.results
-        }
-      }
-      $applications
-      return
-    }
-  }
-
-  $hasMoreData = $true
-  $counter = 0
-  while ($hasMoreData) {
+  do {
     $applicationResponse = Invoke-vRNIRestMethod @listParams
-
-    Write-Verbose ("$($applicationResponse.total_count) applications to process")
-    if ($applicationResponse.total_count -gt $size) {
-      $listParams['Uri'] += "&cursor=$($applicationResponse.cursor)"
+    Write-Verbose ("$($applicationResponse.total_count - $applications.Count) applications to retrieve")
+    
+    if ($($applications.Count + $size) -lt $applicationResponse.total_count) {
+      # Update the cursor in the endpoint
+      $listParams['Uri'] = $($listParams['Uri'] -Replace 'size=.*$',"size=$size&cursor=$($applicationResponse.cursor)")
+      Write-Verbose ("API Endpoint: $($listParams['Uri'])")
     }
 
-    foreach ($app in $applicationResponse.results) {
-      # Retrieve application details and store them
-      $app_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($app.entity_id)"
-      $applications.Add($app_info) | Out-Null
-
-      $counter++
+    # With older versions of the API, must get details about each application
+    if ($Script:vRNI_API_Version -lt [System.Version]"1.1.0") {
+      foreach ($app in $applicationResponse.results) {
+        # Retrieve application details and store them
+        $app_info = Invoke-vRNIRestMethod -Connection $Connection -Method GET -URI "/api/ni/groups/applications/$($app.entity_id)"
+        $applications.Add($app_info) | Out-Null
+      }
+    } else {
+      $applications += $applicationResponse.results
     }
+  } while ($applications.Count -lt $applicationResponse.total_count)
 
-    $remaining = $applicationResponse.total_count - $counter
-    if ($remaining -gt 0) {
-      Write-Verbose "$remaining more applications to process"
-      $hasMoreData = $true
-    }
-    else {
-      $hasMoreData = $false
-    }
-  }
-
+  Write-Verbose ("Retrieved $($applications.count) applications")
   $applications
 }
 
